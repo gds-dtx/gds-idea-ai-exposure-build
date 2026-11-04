@@ -1,0 +1,54 @@
+name = "NHS"
+source = "NHS Jobs / TRAC adverts, 2020-2026 (UK-wide feed, England kept)"
+owner = "DSIT AI exposure team"
+
+[scoring]
+primary_model = "gpt-oss-120b"
+bedrock_model_id = "openai.gpt-oss-120b-1:0"
+
+[weighting]
+primary_spec = "rake_1d"
+target_source = "NHS Digital, NHS Workforce Statistics (HCHS), May 2026"
+target_date = "2026-05-31"
+# The rake uses adverts from these years (pay band is only reliably populated from 2021).
+rake_years = [2021, 2022, 2023, 2024, 2025, 2026]
+# 1D IPF only: NHS Digital does not publish the staff_group x region x grade joint.
+dimensions = ["staff_group", "grade", "region"]
+ipf_max_iter = 100
+ipf_tol = 1e-6
+
+[salary]
+primary = "NHS Digital Staff Earnings Estimates, July 2026"
+base_year = 2026   # advert salaries are uprated to this year for the sensitivity column
+min_cell_sample = 30
+
+# v1 adopts these pre-scaffold outputs (paths relative to settings.LEGACY_ROOT).
+[releases]
+v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+
+[legacy]
+vacancies = "NHS/extracted_data/vacancies_full.parquet"
+tasks = "NHS/extracted_data/tasks_full.parquet"
+weights = "NHS/derived_data/raking/vacancy_weights.parquet"   # used only to check reproduction
+
+[raw]
+# The NHS raw adverts for v1 (NHS Jobs CSV extracts 2019-2026, 10.7 GB) were uploaded directly
+# to build/sector=nhs/release=v1/raw/ on 2026-10-27; they have no older S3 copy.
+# They have no older S3 copy, so there is nothing for `aie build nhs raw` to copy.
+files = []
+
+# Official statistics for this release, copied into build/sector=nhs/release=<r>/reference/.
+[reference_sources]
+"hchs_core1_may2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/raw/Core 1. Staff group - England, NHSE region, ICS and org, May-26.csv"
+"hchs_core6_may2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/raw/Core 6. Staff group and grade - England, May-26.csv"
+"postcode_area_to_nhse_region.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/reference/postcode_to_nhse_region.csv"
+"earnings_estimates_jul2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-analysis/data/raw/earnings/monthly_earnings_estimates_jul2026.csv"
+"earnings_by_band_jul2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-analysis/data/raw/earnings/monthly_earnings_by_band_grade_step_jul2026.csv"
+
+[llm]
+extract_system_prompt = """You are an expert on work in the UK NHS (National Health Service), across clinical, \
+scientific, and administrative roles. Your job is to extract the tasks from a job advert and \
+assess the automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on work in the UK NHS. You classify tasks that were extracted from a \
+job advert by how substantive each is to the role, so that non-meaningful items can be filtered \
+out before analysis."""

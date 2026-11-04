@@ -1,0 +1,67 @@
+name = "Civil Service"
+source = "Civil Service Jobs adverts (GRID extract), profession-corrected"
+owner = "DSIT AI exposure team"
+
+[scoring]
+# CS headline numbers use the mean of 8 models. Cross-sector cuts use gpt-oss-120b, one of
+# the 8, because it is the only model every sector has.
+primary_model = "ensemble-8"
+models = [
+    "sonnet-4-6", "qwen-3-235b", "openai-oss-120b", "llama-maverick",
+    "glm-5", "nova-2-lite", "nemotron-super", "ministral-14b-3",
+]
+# CS calls gpt-oss "openai-oss-120b"; the contract name is gpt-oss-120b.
+rename_models = { "openai-oss-120b" = "gpt-oss-120b" }
+
+[weighting]
+primary_spec = "rake_1d"
+target_source = "Civil Service Statistics data browser 2026 (dept x grade x profession)"
+target_date = "2026"
+# v1 ADOPTS the weights gds-idea-ai-exposure published (stage 3). Porting CS's raking (1D and
+# the 3D post-stratification, CS-stats suppression handling) is part of folding that repo in.
+
+[salary]
+primary = "Civil Service Statistics mean salary, dept x grade x profession with fallbacks"
+
+# CS releases.
+#   v1  legacy: the original pipeline (role-level, single-model, still read by older
+#       products). Data only: inputs in build/.../release=v1/raw/,
+#       tables (old schema) in curated/sector=civil-service/release=v1/, cuts in
+#       cuts/civil-service/release=v1/. Not built here. Copied by a one-off migration script.
+#   v2  the current CS outputs (8-model ensemble, GRID, raked 1D/3D), adopted from the old
+#       layout's ai-exposure/v2/ and mapped onto the curated contract.
+[releases]
+v1 = "legacy"
+v2 = "adopt"
+
+# v2 adopts these (paths relative to settings.LEGACY_ROOT).
+[legacy]
+adverts = "v2/raw/grid_post_processed_profession_corrected.parquet"
+canonical = "v2/raw/canonical_vacancy_dataset.parquet"
+tasks = "v2/raw/grid_tasks_scored_ALL_MODELS_wide.parquet"
+weights = "v2/raw/vacancy_weights.parquet"
+vacancy_exposure = "v2/raw/vacancy_exposure.parquet"   # used only to check reproduction
+
+# Every current (non-OLD_*) file in ai-exposure/v2/raw, so release=v2/raw/ is complete.
+[raw]
+files = [
+    "v2/raw/canonical_vacancy_dataset.parquet",
+    "v2/raw/grid_tasks_scored_ALL_MODELS_wide.parquet",
+    "v2/raw/vacancy_weights.parquet",
+    "v2/raw/vacancy_exposure.parquet",
+    "v2/raw/vacancy_exposure_metadata.json",
+    "v2/raw/grid_as_scored.parquet",
+    "v2/raw/grid_post_processed_profession_corrected.parquet",
+    "v2/raw/grid_tasks_scored_ALL_MODELS_long_w_reasoning.parquet",
+    "v2/raw/salary_lookup.parquet",
+    "v2/raw/salary_lookup_metadata.json",
+    "v2/raw/vacancy_weights_metadata.json",
+    "v2/raw/canonical_vacancy_dataset_metadata.json",
+]
+
+[llm]
+extract_system_prompt = """You are an expert on UK Civil Service work. Your job is to extract the tasks from a job \
+advert and assess the automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on UK Civil Service work. You classify tasks that were extracted from a \
+job advert by how substantive each is to the role, so that non-meaningful items can be filtered \
+out before analysis."""

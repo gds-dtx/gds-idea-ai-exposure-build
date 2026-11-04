@@ -1,0 +1,51 @@
+[project]
+name = "aie"
+version = "0.1.0"
+description = "AI exposure build: raw adverts -> clean -> scored -> weighted -> curated -> cuts, for every public-sector workforce."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.34",
+    "duckdb>=1.1",
+    "numpy>=1.26",
+    "odfpy>=1.4.1",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+    "pydantic>=2.7",
+    "truststore>=0.10.5",
+]
+
+[project.optional-dependencies]
+# Only needed to submit new Bedrock batch jobs (aie score ...).
+llm = ["llmbo-bedrock"]
+
+[project.scripts]
+aie = "aie.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.uv.sources]
+llmbo-bedrock = { git = "https://github.com/co-cddo/gds-idea-llmbo.git" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aie"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"methodology.toml" = "aie/methodology.toml"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B905"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

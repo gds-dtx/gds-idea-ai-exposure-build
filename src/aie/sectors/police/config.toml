@@ -1,0 +1,99 @@
+name = "Police"
+source = "Police force job boards (officer, staff and PCSO adverts), 2017-2026"
+owner = "DSIT AI exposure team"
+
+[scoring]
+primary_model = "gpt-oss-120b"
+bedrock_model_id = "openai.gpt-oss-120b-1:0"
+
+[weighting]
+# Police staff (incl. designated officers) + PCSOs, raked to Home Office FTE by force
+# (sectors/police/workforce.py, docs/police_workforce.md). Officers, specials and
+# volunteers are NOT raked: officer adverts are few, senior and mostly without salary.
+primary_spec = "rake_force_staff"
+target_measure = "fte"
+min_unit_adverts = 30
+target_source = "Home Office, Police workforce, England and Wales, open data table (workforce), published 2026-07-22"
+target_date = "31 March 2026"
+reference_file = "police_workforce_open_data_2026.ods"
+ipf_max_iter = 100
+ipf_tol = 1e-6
+
+[reference_sources]
+"police_workforce_open_data_2026.ods" = "https://assets.publishing.service.gov.uk/media/6a58d48c7eb057103bd945ba/open-data-table-police-workforce-220726.ods"
+
+[salary]
+primary = "advert salary range midpoint (no official pay source wired in yet)"
+
+[releases]
+v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+
+[legacy]
+vacancies = "police/extracted_data/vacancies_full.parquet"
+tasks = "police/extracted_data/labelled_tasks_full.parquet"
+
+[raw]
+files = ["police/all_police_jobs_combined.csv"]
+
+# ONS region (or nation) of each force, for cuts and for a future force-level rake.
+[force_region]
+"Avon & Somerset" = "South West"
+"Bedfordshire" = "East of England"
+"Cambridgeshire" = "East of England"
+"Cheshire" = "North West"
+"City of London" = "London"
+"Cleveland" = "North East"
+"Cumbria" = "North West"
+"Derbyshire" = "East Midlands"
+"Devon & Cornwall" = "South West"
+"Dorset" = "South West"
+"Durham" = "North East"
+"Dyfed Powys" = "Wales"
+"Essex" = "East of England"
+"Gloucestershire" = "South West"
+"Greater Manchester" = "North West"
+"Gwent" = "Wales"
+"Hampshire" = "South East"
+"Hertfordshire" = "East of England"
+"Humberside" = "Yorkshire and The Humber"
+"Kent" = "South East"
+"Lancashire" = "North West"
+"Leicestershire" = "East Midlands"
+"Lincolnshire" = "East Midlands"
+"Merseyside" = "North West"
+"Metropolitan" = "London"
+"Norfolk" = "East of England"
+"North Wales" = "Wales"
+"North Yorkshire" = "Yorkshire and The Humber"
+"Northamptonshire" = "East Midlands"
+"Northumbria" = "North East"
+"Nottinghamshire" = "East Midlands"
+"South Wales" = "Wales"
+"South Yorkshire" = "Yorkshire and The Humber"
+"Staffordshire" = "West Midlands"
+"Suffolk" = "East of England"
+"Surrey" = "South East"
+"Sussex" = "South East"
+"Thames Valley" = "South East"
+"Warwickshire" = "West Midlands"
+"West Mercia" = "West Midlands"
+"West Midlands" = "West Midlands"
+"West Yorkshire" = "Yorkshire and The Humber"
+"Wiltshire" = "South West"
+"Scotland" = "Scotland"
+"Northern Ireland" = "Northern Ireland"
+"Surrey & Sussex Police Collaboration" = "South East"
+"Norfolk and Suffolk Constabularies" = "East of England"
+"British Transport Police" = "National"
+"Ministry of Defence Police" = "National"
+"Civil Nuclear Constabulary" = "National"
+
+[llm]
+extract_system_prompt = """You are an expert on work in UK policing, covering both sworn roles (police constables, \
+detectives, sergeants and above, special constables) and police staff and PCSO roles such as \
+control room, investigation support, forensics, intelligence analysis, custody, criminal \
+justice, digital and corporate/administrative functions. Your job is to extract the tasks \
+from a job advert and assess the automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on work in UK policing. You classify tasks that were extracted from a \
+job advert by how substantive each is to the role, so that non-meaningful items can be \
+filtered out before analysis."""

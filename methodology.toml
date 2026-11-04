@@ -1,0 +1,71 @@
+# The single source of truth for how exposure is turned into categories and £.
+#
+# Every number here used to be copied by hand into 2-5 repos. It now lives only here.
+# The version is stamped on every metrics row and every cut's metadata.
+#
+# curated/ holds metrics for the CURRENT version only. Past versions are kept as settings
+# (see [history] at the bottom) and recomputed on demand from the release's tasks + vacancies,
+# which never change once published:   aie metrics <sector> --release <r> --methodology m1
+#
+# Sensitivity scenarios (decay 0.9, other cut-offs, ...) are NOT defined here. They live in the
+# analysis repo's scenarios.toml and are computed on the fly; only the primary is published.
+
+version = "m1"
+notes = "the paper's quadrant table (2026-09-30), fixed CS thresholds refreshed 2026-10-06, decay 0.75, MIN_TASKS 3."
+
+[decay]
+# Geometric task decay: w_i ∝ delta^(i-1), normalised per vacancy. 1.0 = uniform.
+primary = 0.75
+comparison = 1.0
+
+[population]
+# Adverts with fewer tasks than this are dropped BEFORE raking (no weight, not in any total).
+min_tasks = 3
+
+[quadrants]
+# PRIMARY basis: the fixed values from CS's own 1D ensemble run (model_labour_impacts.ipynb),
+# i.e. CS's weighted within-stratum quartiles at the primary decay, applied to every sector.
+# A scenario that changes decay.primary, high_mean_top or disp_low_bottom re-derives them the
+# same way (CS ensemble-8, rake_1d weights) unless it sets fixed_* itself ("option b", 2026-10-28).
+primary_basis = "fixed"
+fixed_source = "values"  # "values" = the numbers below; "rederive" = recompute from CS
+fixed_mean_hi = 0.4172
+fixed_high_var_lo = 0.0101
+fixed_low_var_hi = 0.0183
+# SENSITIVITY basis: each sector's own weighted, within-stratum quartiles.
+high_mean_top = 0.25     # top 25% by mean exposure is the "high" stratum
+disp_low_bottom = 0.25   # variance split within each stratum
+task_top_pct = 0.25      # a task is "automatable" if in the top 25% of task exposure
+categories = ["Displacement-type", "Augmentation-type", "Concentrated", "Insulated", "Unclassified", "Unscored"]
+
+[valuation]
+# opportunity  = weight x salary x mean_exposure            (every role)
+# cashable     = weight x salary                            (Displacement-type only)
+# non_cashable = weight x salary x mean_exposure            (Augmentation-type + Concentrated)
+cashable_categories = ["Displacement-type"]
+non_cashable_categories = ["Augmentation-type", "Concentrated"]
+overhead_multiplier = 1.0
+optimism_bias = 1.0
+
+[comparability]
+# Cross-sector cuts must use one scoring model. gpt-oss-120b is the only model every sector has
+# (CS scored it as one of its 8 ensemble members).
+cross_sector_score_model = "gpt-oss-120b"
+
+# --- History ---------------------------------------------------------------------------------
+# To change the primary methodology:
+#   1. copy the current [decay] [population] [quadrants] [valuation] tables into
+#      [history.<current version>.*] below, unchanged;
+#   2. edit the tables above, bump `version`, and add a [[changelog]] entry;
+#   3. aie publish all --release <r>   (curated metrics now hold the new version only).
+# The old version can still be reproduced exactly with `aie metrics ... --methodology <old>`.
+# Old published headline tables stay in outputs/, as the record of what was quoted.
+
+[[changelog]]
+version = "m1"
+date = "2026-10-28"
+signed_off_by = ""  # the methodology and Civil Service leads
+change = "First scaffold methodology: the paper's quadrant table, fixed CS thresholds refreshed 2026-10-06, decay 0.75, MIN_TASKS 3."
+
+[history]
+# e.g. [history.m1.decay] primary = 0.75 ... (empty until m2 exists)

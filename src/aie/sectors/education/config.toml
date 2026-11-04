@@ -1,0 +1,74 @@
+name = "Education"
+source = "DfE Teaching Vacancies service adverts (all years with usable advert text)"
+owner = "DSIT AI exposure team"
+
+[scoring]
+primary_model = "gpt-oss-120b"
+bedrock_model_id = "openai.gpt-oss-120b-1:0"
+
+[weighting]
+primary_spec = "rake_1d"
+target_source = "DfE School Workforce in England, reporting year 2025 (2025/26)"
+target_date = "2025/26"
+dimensions = ["dfe_category", "phase"]
+ipf_max_iter = 100
+ipf_tol = 1e-6
+
+# FTE, England, total state-funded schools, 2025/26, read from the EES Table Tool on 2026-10-07
+# (the EES API and CSV download were blocked). Sums to 984,609.3 vs the published 984,610.
+[weighting.targets.dfe_category]
+"Head teacher" = 22199.7
+"Deputy head teacher" = 18307.6
+"Assistant head teacher" = 32661.1
+"Classroom teacher" = 393204.0
+"Administrative staff" = 64347.4
+"Auxiliary staff" = 70166.6
+"Leadership - Non Teacher" = 2455.8
+"Other school support staff" = 44266.6
+"School business professionals" = 25838.0
+"Teaching assistants" = 295182.9
+"Technicians" = 15980.6
+
+# Teacher + support FTE by type of school. Only the two types the advert phase field can
+# represent; special/PRU and centrally employed (116,607 FTE, 11.8%) cannot be placed.
+[weighting.targets.phase]
+"State-funded nursery and primary" = 495685.9   # 212,798.9 + 282,887.0
+"State-funded secondary" = 372317.5             # 218,542.9 + 153,774.6
+
+[weighting.phase_map]
+primary = "State-funded nursery and primary"
+middle_deemed_primary = "State-funded nursery and primary"
+nursery = "State-funded nursery and primary"
+secondary = "State-funded secondary"
+middle_deemed_secondary = "State-funded secondary"
+
+[salary]
+primary = "DfE Teacher pay (TPS) median FTE pay for teachers; advert salary for support staff"
+
+[releases]
+v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+
+[legacy]
+vacancies = "Education/extracted_data/vacancies_full.parquet"
+tasks = "Education/extracted_data/labelled_tasks_full.parquet"
+weights = "Education/derived_data/raking/vacancy_weights.parquet"
+
+[raw]
+files = [
+    "Education/raw/total_vacancies_published-000000000000.csv",
+    "Education/raw/total_vacancies_published-000000000001.csv",
+    "Education/raw/total_vacancies_published-000000000002.csv",
+    "Education/raw/total_vacancies_published-000000000003.csv",
+    "Education/raw/total_vacancies_published-000000000004.csv",
+    "Education/raw/total_vacancies_published-000000000005.csv",
+    "Education/raw/total_vacancies_published-000000000006.csv",
+    "Education/raw/total_vacancies_published-000000000007.csv",
+]
+
+[llm]
+extract_system_prompt = """You are an expert on work in the UK education sector, across teaching, teaching support, \
+and school administration/operations roles. Your job is to extract the tasks from a job advert \
+and assess the automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on work in the UK education sector. You classify tasks that were \
+extracted from a job advert by how substantive each is to the role, so that non-meaningful \
+items can be filtered out before analysis."""

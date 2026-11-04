@@ -1,0 +1,52 @@
+name = "Local government"
+source = "Council job boards (WMJobs, LG Jobs, North East Jobs, LGJobs.com, JobsGoPublic, SE Jobs)"
+owner = "DSIT AI exposure team"
+
+[scoring]
+primary_model = "gpt-oss-120b"
+bedrock_model_id = "openai.gpt-oss-120b-1:0"
+
+[weighting]
+# Raked to council FTE from the ONS Quarterly Public Sector Employment Survey, as
+# published per authority by the LGA (see qpses.py and docs/qpses.md for scope and matching).
+primary_spec = "rake_council"   # council cells (small councils pooled by region x type)
+target_measure = "fte"          # salaries are full-time; NHS and Education also rake to FTE
+min_unit_adverts = 30           # fewer eligible adverts than this: pooled, not its own cell
+regions = [                     # England only, like NHS and Education (Wales left unweighted)
+    "East Midlands", "East of England", "London", "North East", "North West", "South East",
+    "South West", "West Midlands", "Yorkshire and the Humber",
+]
+target_source = "ONS Quarterly Public Sector Employment Survey 2026 Q2, per authority, published by the LGA 2026-09-16"
+target_date = "2026 Q2"
+reference_file = "qpses_2026_q2.xlsx"
+ipf_max_iter = 100
+ipf_tol = 1e-6
+
+# Official statistics for this release, copied into build/sector=local-govt/release=<r>/reference/.
+# Page: https://www.local.gov.uk/publications/ons-quarterly-public-sector-employment-survey
+[reference_sources]
+"qpses_2026_q2.xlsx" = "https://www.local.gov.uk/sites/default/files/documents/QPSES%202026%20Q2.xlsx"
+"qpses_2026_q2_summary.pdf" = "https://www.local.gov.uk/sites/default/files/documents/QPSES%202026%20Q2%20-%20summary.pdf"
+
+[salary]
+primary = "advert salary range midpoint (no official pay source wired in yet)"
+
+[releases]
+v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+v2 = "adopt"   # same adverts and scores; a council with no adverts is shared out (qpses.share_out)
+
+[legacy]
+vacancies = "local-govt/extracted_data/vacancies_full.parquet"
+tasks = "local-govt/extracted_data/labelled_tasks_full.parquet"
+
+[raw]
+files = ["local-govt/all_local_council_jobs.csv"]
+
+[llm]
+extract_system_prompt = """You are an expert on work in UK local government, across council services such as social \
+care, housing, planning, waste and environment, revenues and benefits, libraries, schools \
+support, highways, and corporate/administrative functions. Your job is to extract the tasks \
+from a job advert and assess the automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on work in UK local government. You classify tasks that were extracted \
+from a job advert by how substantive each is to the role, so that non-meaningful items can be \
+filtered out before analysis."""
