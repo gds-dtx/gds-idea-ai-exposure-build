@@ -9,8 +9,10 @@ bedrock_model_id = "openai.gpt-oss-120b-1:0"
 [weighting]
 # Post-stratified to each body's own published staff number (targets.py,
 # docs/public_corporations.md). One cell per body; the BBC is split into public service and
-# commercial (BBC Studios etc.), as its accounts are.
-primary_spec = "rake_employer"
+# commercial (BBC Studios etc.), as its accounts are. Primary: the staff number is shared over
+# adverts that state a salary, so £ totals scale up from the salaried adverts (2026-11-09).
+# rake_employer (every usable advert) is kept as a second spec.
+primary_spec = "rake_employer_salaried"
 target_measure = "fte where published, else average headcount (see [targets])"
 small_cell_adverts = 30  # cells below this are flagged in the diagnostics, not pooled
 target_source = "Each body's annual report and accounts (see [targets])"

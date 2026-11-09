@@ -69,19 +69,27 @@ def test_rake_to_employers():
     s = get("public-corporations")
     adverts = pd.DataFrame(
         {
-            "vacancy_id": ["pc-c4-1", "pc-c4-2", "pc-os-1", "pc-os-2"],
-            "org_unit": ["Channel 4", "Channel 4", "Ordnance Survey", "Ordnance Survey"],
-            "in_scope": [True, True, True, False],
+            "vacancy_id": ["pc-c4-1", "pc-c4-2", "pc-c4-3", "pc-os-1", "pc-os-2"],
+            "org_unit": ["Channel 4"] * 3 + ["Ordnance Survey"] * 2,
+            "in_scope": [True, True, True, True, False],
+            "salary_annual_gbp": [40_000.0, None, 50_000.0, 45_000.0, 45_000.0],
         }
     )
-    n_tasks = pd.Series({"pc-c4-1": 5, "pc-c4-2": 2, "pc-os-1": 7, "pc-os-2": 9})
+    n_tasks = pd.Series({"pc-c4-1": 5, "pc-c4-2": 5, "pc-c4-3": 2, "pc-os-1": 7, "pc-os-2": 9})
     out = targets.rake_to_employers(s, adverts, n_tasks)
-    w = out.weights.set_index("vacancy_id")["weight"]
+    w = out.weights.pivot(index="vacancy_id", columns="weight_spec", values="weight")
     c4 = s.config["targets"]["Channel 4"]["value"]
     os_ = s.config["targets"]["Ordnance Survey"]["value"]
-    assert w["pc-c4-1"] == pytest.approx(c4)  # pc-c4-2 has < MIN_TASKS
-    assert pd.isna(w["pc-c4-2"]) and pd.isna(w["pc-os-2"])
-    assert w["pc-os-1"] == pytest.approx(os_)
+    # all usable adverts: c4-1 and c4-2 share Channel 4 (c4-3 has < MIN_TASKS)
+    assert w.loc["pc-c4-1", targets.SPEC] == pytest.approx(c4 / 2)
+    assert w.loc["pc-c4-2", targets.SPEC] == pytest.approx(c4 / 2)
+    # salaried only: c4-1 carries all of Channel 4, c4-2 (no salary) none
+    assert w.loc["pc-c4-1", targets.SALARIED] == pytest.approx(c4)
+    assert pd.isna(w.loc["pc-c4-2", targets.SALARIED])
+    assert w.loc["pc-os-1", targets.SALARIED] == pytest.approx(os_)
+    assert pd.isna(w.loc["pc-os-2", targets.SPEC])
+    primary = out.weights[out.weights["is_primary"]]["weight_spec"].unique().tolist()
+    assert primary == [targets.SALARIED]
     assert "Ordnance Survey" in out.diagnostics["small_cells"]
     assert "Network Rail" in out.diagnostics["empty_cells"]
 

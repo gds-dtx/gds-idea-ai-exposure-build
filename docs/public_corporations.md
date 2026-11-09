@@ -46,7 +46,7 @@ the range is empty, the salary stated in the advert text is used instead
 (`sectors/police/salary_text.py`). Nothing is estimated, so adverts with no stated salary stay
 out of the £ figures.
 
-## Raking targets (L3, spec `rake_employer`)
+## Raking targets (L3, primary spec `rake_employer_salaried`)
 
 No official table gives staff numbers for each public corporation. ONS Public Sector
 Employment publishes only a total for all public corporations, and that total leaves out the
@@ -59,6 +59,15 @@ them: BBC Studios, BBC Global News and the other commercial companies go to comm
 eligible advert in a cell gets the weight target divided by n. Cells are not pooled across
 bodies, because the bodies do unrelated work. Cells with fewer than 30 adverts are flagged in
 `rake_diagnostics.json` (`small_cells`), and their figures need that caveat.
+
+**Which adverts share the target.** The primary spec, `rake_employer_salaried`, shares each
+organisation's staff number over its adverts that **state a salary**. £ totals therefore scale
+up from the salaried adverts to the whole organisation: with 5,000 usable adverts of which
+2,000 give a salary, each salaried advert stands for target / 2,000. This assumes adverts
+without a salary are like those with one. FTE, exposure and quadrant shares are on the same
+salaried adverts. The second spec, `rake_employer`, shares the target over every usable
+advert. Adverts without a salary then count in FTE and exposure but add £0, so £ totals cover
+only the salaried share of staff (79% overall; Bank of England 27%).
 
 The figures and their details are in `config.toml [targets]`. The PDFs are copied to
 `build/.../release=v1/reference/`.
