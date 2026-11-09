@@ -97,11 +97,57 @@ def n_tasks_by_vacancy(sector: Sector, release: str) -> pd.Series:
     return tasks.groupby("vacancy_id").size()
 
 
+ALL_ADVERTS = "_all_adverts"
+
+
+def weight_on_salaried(sector: Sector, release: str, adverts, ext, n_tasks):
+    """Run the sector's own rake twice and keep both.
+
+    Primary (the sector's usual spec name): only adverts that STATE a salary are eligible, so
+    each raking target is shared over salaried adverts and £ totals scale up from them (with
+    5,000 usable adverts of which 2,000 give a salary, the target is shared over the 2,000).
+    FTE, exposure and quadrant shares are then on the salaried adverts too.
+    `<spec>_all_adverts`: the same rake over every usable advert (the earlier releases' basis),
+    where adverts without a salary carry weight but add £0.
+    """
+    from .sectors.base import WeightOutput
+
+    has_salary = adverts["salary_annual_gbp"].notna()
+    salaried = adverts.assign(in_scope=adverts["in_scope"].fillna(False).astype(bool) & has_salary)
+    main = sector.weight(release, salaried, ext, n_tasks)
+    alt = sector.weight(release, adverts, ext, n_tasks)
+    alt_w = alt.weights.assign(
+        weight_spec=alt.weights["weight_spec"] + ALL_ADVERTS, is_primary=False
+    )
+    targets = None
+    if main.targets is not None:
+        col = "weight_spec" if "weight_spec" in main.targets else "spec"
+        alt_t = alt.targets.assign(**{col: alt.targets[col] + ALL_ADVERTS})
+        targets = pd.concat([main.targets, alt_t], ignore_index=True)
+    diagnostics = {
+        "weighted_on": "adverts that state a salary (primary); every usable advert (_all_adverts)",
+        "salaried_eligible_adverts": int(sector.min_tasks_sample(salaried, n_tasks).shape[0]),
+        "all_eligible_adverts": int(sector.min_tasks_sample(adverts, n_tasks).shape[0]),
+        **main.diagnostics,
+        "all_adverts": alt.diagnostics,
+    }
+    return WeightOutput(
+        pd.concat([main.weights, alt_w], ignore_index=True),
+        targets,
+        diagnostics,
+        inputs=list(dict.fromkeys([*main.inputs, *alt.inputs])),
+    )
+
+
 def weight(sector: Sector, release: str) -> None:
     clean_dir = settings.build_dir(sector.slug, "clean", release)
     adverts = storage.read_parquet(storage.join(clean_dir, "adverts.parquet"))
     ext = storage.read_parquet(storage.join(clean_dir, "adverts_ext.parquet"))
-    out = sector.weight(release, adverts, ext, n_tasks_by_vacancy(sector, release))
+    n_tasks = n_tasks_by_vacancy(sector, release)
+    if sector.weights_on_salaried(release):
+        out = weight_on_salaried(sector, release, adverts, ext, n_tasks)
+    else:
+        out = sector.weight(release, adverts, ext, n_tasks)
     folder = settings.build_dir(sector.slug, "weights", release)
     w = contract.conform(out.weights, "weights")
     inputs = [clean_dir, settings.build_dir(sector.slug, "scored", release), *out.inputs]

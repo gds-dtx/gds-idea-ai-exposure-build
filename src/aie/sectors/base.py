@@ -95,6 +95,13 @@ class Sector(ABC):
                 f"build/sector={self.slug}/release={release}/ but it is not built by this repo"
             )
 
+    def weights_on_salaried(self, release: str) -> bool:
+        """True if this release shares each raking target over adverts that state a salary
+        only (config.toml [release_settings.<release>] weight_on_salaried), so £ totals scale
+        up from salaried adverts. See aie.build.weight."""
+        rs = self.config.get("release_settings", {}).get(release, {})
+        return bool(rs.get("weight_on_salaried", False))
+
     def ids(self, s: pd.Series) -> pd.Series:
         return contract.prefixed_id(self.slug, s)
 

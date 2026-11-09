@@ -52,3 +52,40 @@ def test_compute_metrics_uses_given_fixed_thresholds():
     rows, thr = metrics.compute_metrics(tasks, roles, "m", fixed=loose)
     assert rows["quadrant"].tolist() == ["Displacement-type", "Displacement-type"]
     assert thr.iloc[0]["mean_hi"] == 0.05
+
+
+def test_weight_on_salaried_runs_the_rake_twice():
+    import pandas as pd
+
+    from aie import build
+    from aie.sectors.base import WeightOutput
+
+    class Toy:
+        slug = "toy"
+
+        def min_tasks_sample(self, adverts, n_tasks):
+            return adverts[adverts["in_scope"]]
+
+        def weight(self, release, adverts, ext, n_tasks):
+            pool = adverts[adverts["in_scope"]]
+            w = adverts["vacancy_id"].map(pd.Series(100.0 / len(pool), index=pool["vacancy_id"]))
+            weights = pd.DataFrame(
+                {"vacancy_id": adverts["vacancy_id"], "weight_spec": "rake_x", "weight": w,
+                 "is_primary": True, "target_source": "t", "target_date": "d"}
+            )  # fmt: skip
+            return WeightOutput(
+                weights, pd.DataFrame({"weight_spec": ["rake_x"]}), {"n": len(pool)}
+            )
+
+    adverts = pd.DataFrame(
+        {"vacancy_id": list("abcde"), "in_scope": [True] * 4 + [False],
+         "salary_annual_gbp": [30_000.0, None, 40_000.0, None, 50_000.0]}
+    )  # fmt: skip
+    out = build.weight_on_salaried(Toy(), "v2", adverts, None, None)
+    w = out.weights.pivot(index="vacancy_id", columns="weight_spec", values="weight")
+    assert w.loc["a", "rake_x"] == 50.0 and pd.isna(w.loc["b", "rake_x"])  # 100 over 2 salaried
+    assert w.loc["b", "rake_x_all_adverts"] == 25.0  # 100 over 4 usable
+    assert pd.isna(w.loc["e", "rake_x"])  # out of scope stays out
+    prim = out.weights.groupby("weight_spec")["is_primary"].first().to_dict()
+    assert prim == {"rake_x": True, "rake_x_all_adverts": False}
+    assert set(out.targets["weight_spec"]) == {"rake_x", "rake_x_all_adverts"}

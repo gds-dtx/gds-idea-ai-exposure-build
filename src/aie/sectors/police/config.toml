@@ -27,6 +27,10 @@ primary = "advert salary range midpoint (no official pay source wired in yet)"
 
 [releases]
 v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+v2 = "adopt"   # same adverts and scores as v1; weights shared over adverts that state a salary (2026-11-09)
+
+[release_settings.v2]
+weight_on_salaried = true  # aie.build.weight_on_salaried; v1 basis kept as <spec>_all_adverts
 
 [legacy]
 vacancies = "police/extracted_data/vacancies_full.parquet"
