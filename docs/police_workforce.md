@@ -59,3 +59,10 @@ Full diagnostics are in `build/sector=police/release=v1/weights/rake_diagnostics
    then `aie publish police --release v2`.
 3. Check `coverage.not_raked_forces_top` in the diagnostics for new force name variants and
    add any to `ALIASES` in `workforce.py`.
+
+## Releases
+
+- **v1** (2026-10-29): police staff and PCSOs raked to Home Office FTE by force.
+- **v2** (2026-11-09): same adverts, scores and targets as v1, but each target is shared over
+  the adverts that **state a salary**, so £ totals scale up from them. The v1 basis is kept as
+  the `rake_force_staff_all_adverts` weight.
