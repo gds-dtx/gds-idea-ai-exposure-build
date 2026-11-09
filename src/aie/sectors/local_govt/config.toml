@@ -32,10 +32,9 @@ ipf_tol = 1e-6
 primary = "advert salary range midpoint (no official pay source wired in yet)"
 
 [releases]
-v1 = "adopt"   # the existing outputs, mapped onto the curated contract
-v2 = "adopt"   # same adverts and scores; a council with no adverts is shared out (qpses.share_out)
+v1 = "adopt"   # the existing outputs, mapped onto the curated contract; councils with no adverts shared out (qpses.share_out, 2026-11-04)
 
-[release_settings.v2]
+[release_settings.v1]
 weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
 
 [legacy]

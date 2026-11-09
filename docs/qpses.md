@@ -80,15 +80,17 @@ in `targets.parquet`.
 1. Add the new xlsx and summary URLs to `sectors/local_govt/config.toml` under
    `[reference_sources]`, and change `reference_file`, `target_source` and `target_date`.
 2. Rebuild the current release in place (a new release only if the team asks for one):
-   `aie build local-govt reference|clean|weight --release v2`, then
-   `aie publish local-govt --release v2`.
+   `aie build local-govt reference|clean|weight --release v1`, then
+   `aie publish local-govt --release v1`.
 3. Check `rake_diagnostics.json` → `coverage.unmatched_councils_top` for new name variants,
    and add any to `ALIASES` in `qpses.py`.
 
 ## Releases
 
-- **v1** (2026-10-28): council cells, with small councils pooled by region x type.
-- **v2** (2026-11-04): a council with no adverts is shared out over its region x type donors.
-- **v2 updated in place** (2026-11-09): each target is now shared over the adverts that
-  **state a salary**, so £ totals scale up from them. The earlier basis is kept as the
-  `rake_council_all_adverts` weight.
+There is one release, **v1**, updated in place:
+
+- 2026-10-28: council cells, with small councils pooled by region x type.
+- 2026-11-04: a council with no adverts is shared out over its region x type neighbours in
+  proportion to their FTE (it was first built as a separate v2; folded into v1 on 2026-11-09).
+- 2026-11-09: each target is shared over the adverts that **state a salary**, so £ totals scale
+  up from them. The earlier basis is kept as the `rake_council_all_adverts` weight.
