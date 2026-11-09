@@ -27,7 +27,7 @@ DEFAULT_BATCH_ROOT = f"s3://{BUCKET}/batch/ai-exposure"
 # Read-only: where the pre-scaffold outputs live. Only the v1 `adopt` steps read from here.
 LEGACY_ROOT = f"s3://{BUCKET}/ai-exposure"
 
-SECTORS = ("civil-service", "nhs", "education", "local-govt", "police")
+SECTORS = ("civil-service", "nhs", "education", "local-govt", "police", "public-corporations")
 
 
 def root() -> str:

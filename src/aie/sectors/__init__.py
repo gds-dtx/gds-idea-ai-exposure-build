@@ -12,6 +12,7 @@ _MODULES = {
     "education": "education",
     "local-govt": "local_govt",
     "police": "police",
+    "public-corporations": "public_corporations",
 }
 
 

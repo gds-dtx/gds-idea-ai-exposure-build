@@ -1,8 +1,8 @@
 # AI exposure: build
 
 Builds AI exposure data for public-sector workforces (Civil Service, NHS, Education, local
-government and police), from job adverts to a set of curated tables, and provides the shared
-methods and cut engine that analysis and dashboard code use to read them.
+government, police and public corporations), from job adverts to a set of curated tables, and
+provides the shared methods and cut engine that analysis and dashboard code use to read them.
 
 The package is `aie`. Other projects install it as a library for the curated loader
 (`aie.read`), the catalog, the shared methods and the cut engine (`aie.cuts`).
@@ -77,6 +77,7 @@ official statistics used for weighting are in `docs/`:
 - Local government: ONS QPSES via the LGA ([docs/qpses.md](docs/qpses.md))
 - Police: Home Office police workforce ([docs/police_workforce.md](docs/police_workforce.md))
 - Raking design for local government and police ([docs/raking_local_govt_police.md](docs/raking_local_govt_police.md))
+- Public corporations: each body's annual report ([docs/public_corporations.md](docs/public_corporations.md))
 
 ## Running it
 

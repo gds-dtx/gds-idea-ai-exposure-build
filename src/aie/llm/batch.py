@@ -37,6 +37,8 @@ from .prompts import AutomationScoredTaskOutput, task_extract_and_score_ai_autom
 ROLE_ARN = os.environ.get("AIE_BATCH_ROLE_ARN", "")
 CHUNK = 50_000
 MIN_RECORDS = 100
+# Throwaway copies that top a small retry up to MIN_RECORDS; dropped when output is parsed.
+PAD = "__pad"
 COLLECTABLE = {"Completed", "PartiallyCompleted"}
 # gpt-oss-120b batch pricing, $/token (50% of on-demand). Rough chars-per-token for estimates.
 PRICE_IN, PRICE_OUT = 0.15e-6 * 0.5, 0.60e-6 * 0.5
@@ -161,13 +163,31 @@ def _inferer(run: Run):
     return PrefixedInferer, bucket
 
 
-def submit(run: Run, confirm_usd: float | None, only_ids: set[str] | None = None) -> None:
+def pad_to_minimum(pool: pd.DataFrame) -> pd.DataFrame:
+    """Top a small pool up to MIN_RECORDS with copies of its own rows under throwaway ids
+    (`<id>__pad<n>`), which parse() drops. For retries of a few failed records."""
+    if pool.empty or len(pool) >= MIN_RECORDS:
+        return pool
+    n = MIN_RECORDS - len(pool)
+    pads = pool.sample(n=n, replace=True, random_state=0).reset_index(drop=True)
+    pads["vacancy_id"] = [f"{v}{PAD}{i}" for i, v in enumerate(pads["vacancy_id"])]
+    return pd.concat([pool, pads], ignore_index=True)
+
+
+def submit(
+    run: Run,
+    confirm_usd: float | None,
+    only_ids: set[str] | None = None,
+    pad: bool = False,
+) -> None:
     pool = _pool(run)
     if only_ids is not None:
         pool = pool[pool["vacancy_id"].isin(only_ids)]
     m = run.manifest()
     done = {v for ch in m["chunks"] for v in ch.get("vacancy_ids", [])}
     pool = pool[~pool["vacancy_id"].isin(done)].reset_index(drop=True)
+    if pad:
+        pool = pad_to_minimum(pool)
     est = estimate_cost(run, pool)
     print(f"{run.sector.slug} {run.release} {run.stage}: {est}")
     if len(pool) < MIN_RECORDS:
@@ -257,6 +277,8 @@ def parse(path: Path, stage: str) -> tuple[list[dict], list[dict]]:
         for line in fh:
             r = json.loads(line)
             vid = str(r["recordId"])
+            if PAD in vid:
+                continue
             payload, fail = _payload(r["modelOutput"])
             if fail:
                 statuses.append({"vacancy_id": vid, "status": fail, "n": 0})

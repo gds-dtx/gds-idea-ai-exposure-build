@@ -26,7 +26,7 @@ import pandas as pd
 
 # column -> pandas dtype
 ADVERT_CORE = {
-    "vacancy_id": "string",  # sector-prefixed: cs-, nhs-, edu-, lg-, pol-
+    "vacancy_id": "string",  # sector-prefixed: cs-, nhs-, edu-, lg-, pol-, pc-
     "source_vacancy_id": "string",  # id in the source system / pre-scaffold outputs
     "source": "string",  # e.g. "Civil Service Jobs", "NHS Jobs", "council job boards"
     "posted_date": "datetime64[ns]",
@@ -132,6 +132,7 @@ ID_PREFIX = {
     "education": "edu-",
     "local-govt": "lg-",
     "police": "pol-",
+    "public-corporations": "pc-",
 }
 
 # The quadrant labels in display order.
