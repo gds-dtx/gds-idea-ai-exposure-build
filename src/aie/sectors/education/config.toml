@@ -47,10 +47,9 @@ primary = "DfE Teacher pay (TPS) median FTE pay for teachers; advert salary for 
 
 [releases]
 v1 = "adopt"   # the existing outputs, mapped onto the curated contract
-v2 = "adopt"   # same adverts and scores as v1; weights shared over adverts that state a salary (2026-11-09)
 
-[release_settings.v2]
-weight_on_salaried = true  # aie.build.weight_on_salaried; v1 basis kept as <spec>_all_adverts
+[release_settings.v1]
+weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
 
 [legacy]
 vacancies = "Education/extracted_data/vacancies_full.parquet"

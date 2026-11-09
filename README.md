@@ -18,9 +18,10 @@ The package is `aie`. Other projects install it as a library for the curated loa
  received   table         scores (LLM)  workforce stats  sector          tables
 ```
 
-Each layer reads only the layer before it. Each release of a sector (`v1`, `v2`, …) is written
-once and then left alone; a fix means a new release. Every folder gets a `_meta.json` recording
-its inputs, git commit and methodology version.
+Each layer reads only the layer before it. Fixes and method tweaks rebuild and republish a
+sector's **current** release in place; a new release (`v1`, `v2`, …) is made only when the team
+decides to keep the old one alongside (as for Civil Service v1 → v2). Every folder gets a
+`_meta.json` recording its inputs, git commit and methodology version.
 
 | Layer | Where | What |
 |---|---|---|

@@ -34,10 +34,9 @@ primary = "advert salary range midpoint (no official pay source wired in yet)"
 [releases]
 v1 = "adopt"   # the existing outputs, mapped onto the curated contract
 v2 = "adopt"   # same adverts and scores; a council with no adverts is shared out (qpses.share_out)
-v3 = "adopt"   # same adverts and scores as v2; weights shared over adverts that state a salary (2026-11-09)
 
-[release_settings.v3]
-weight_on_salaried = true  # aie.build.weight_on_salaried; v2 basis kept as <spec>_all_adverts
+[release_settings.v2]
+weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
 
 [legacy]
 vacancies = "local-govt/extracted_data/vacancies_full.parquet"
