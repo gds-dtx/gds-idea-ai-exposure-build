@@ -124,7 +124,8 @@ def main(argv: list[str] | None = None) -> None:
             for ch in m["chunks"]:
                 ch["vacancy_ids"] = [v for v in ch.get("vacancy_ids", []) if v not in ids]
             run.save(m)
-            batch.submit(run, a.confirm_usd, only_ids=ids)
+            # Fewer than 100 failures: padded with throwaway copies (dropped on collect).
+            batch.submit(run, a.confirm_usd, only_ids=ids, pad=True)
 
 
 def _cut(a) -> None:

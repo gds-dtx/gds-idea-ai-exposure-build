@@ -1,0 +1,117 @@
+name = "Public corporations"
+source = "Careers sites of ten public corporations and other public bodies outside the Civil Service, NHS, schools, councils and police (BBC, Bank of England, British Steel, Channel 4, Civil Aviation Authority, National Audit Office, National Highways, Network Rail, Ordnance Survey, Transport for London), 2017-2026"
+owner = "DSIT AI exposure team"
+
+[scoring]
+primary_model = "gpt-oss-120b"
+bedrock_model_id = "openai.gpt-oss-120b-1:0"
+
+[weighting]
+# Post-stratified to each body's own published staff number (targets.py,
+# docs/public_corporations.md). One cell per body; the BBC is split into public service and
+# commercial (BBC Studios etc.), as its accounts are.
+primary_spec = "rake_employer"
+target_measure = "fte where published, else average headcount (see [targets])"
+small_cell_adverts = 30  # cells below this are flagged in the diagnostics, not pooled
+target_source = "Each body's annual report and accounts (see [targets])"
+target_date = "financial year 2024/25 (British Steel: 2021)"
+
+[salary]
+primary = "advert range midpoint (annual £12k-£250k); else the salary the advert text states; never estimated"
+
+[releases]
+v1 = "build"  # cleaned and scored from raw here (no pre-scaffold outputs to adopt)
+
+[raw]
+files = ["~/Downloads/all_public_corporation_jobs.xlsx"]
+
+# Official staff numbers, one per raking cell. `measure` says what the figure counts.
+[targets."BBC public service"]
+value = 17531
+measure = "average FTE, PSB Group (incl. apprentices), 2024/25"
+source = "BBC Group Annual Report and Accounts 2024/25, note D1 (p.170 of the PDF)"
+file = "bbc_annual_report_2024_25.pdf"
+
+[targets."BBC commercial"]
+value = 4242
+measure = "average FTE, Commercial Group (BBC Studios etc., incl. apprentices), 2024/25"
+source = "BBC Group Annual Report and Accounts 2024/25, note D1 (p.170 of the PDF)"
+file = "bbc_annual_report_2024_25.pdf"
+
+[targets."Bank of England"]
+value = 5731
+measure = "average number of persons employed (headcount; no FTE published), year to 28 Feb 2025"
+source = "Bank of England Annual Report and Accounts 2025, staff costs note (p.164 of the PDF)"
+file = "boe_annual_report_2025.pdf"
+
+[targets."British Steel"]
+value = 4568
+measure = "people directly employed (headcount), 2021: the latest stated figure"
+source = "Oxford Economics for British Steel, The Socioeconomic Footprint of British Steel in the UK (2026), p.8"
+file = "british_steel_socioeconomic_footprint_2026.pdf"
+
+[targets."Channel 4"]
+value = 1284
+measure = "average monthly employees on an FTE basis, calendar 2024"
+source = "Channel Four Television Corporation Report and Financial Statements 2024, note 4 (p.189 of the PDF)"
+file = "channel4_annual_report_2024.pdf"
+
+[targets."Civil Aviation Authority"]
+value = 1602
+measure = "monthly average number of employees (Group), 2024/25"
+source = "UK Civil Aviation Authority Annual Report and Accounts 2024/25, note 3 (p.122 of the PDF)"
+file = "caa_annual_report_2024_25.pdf"
+
+[targets."National Audit Office"]
+value = 1028
+measure = "average FTE (permanent 1,014, temporary 13, inward secondees 1), 2024-25"
+source = "National Audit Office Annual Report and Accounts 2024-25, Figure 15 (p.120 of the PDF)"
+file = "nao_annual_report_2024_25.pdf"
+
+[targets."National Highways"]
+value = 6866
+measure = "average FTE persons employed, year to 31 March 2025"
+source = "National Highways Annual Report and Accounts 2024-25, staff report (p.173 of the PDF)"
+file = "national_highways_annual_report_2024_25.pdf"
+
+[targets."Network Rail"]
+value = 41331
+measure = "monthly average FTE employees (Group), 2024/25"
+source = "Network Rail Limited Annual Report and Accounts 2025, note 6 (p.195 of the PDF)"
+file = "network_rail_annual_report_2025.pdf"
+
+[targets."Ordnance Survey"]
+value = 1415
+measure = "average monthly FTE, permanent staff incl. directors, 2024-25"
+source = "Ordnance Survey Limited Annual Report and Financial Statements 2024-25, note 4 (p.114 of the PDF)"
+file = "ordnance_survey_annual_report_2024_25.pdf"
+
+[targets."Transport for London"]
+value = 27638
+measure = "FTE incl. non-permanent labour, TfL total (excl. Places for London, LT Museum, Crossrail), 31 March 2025"
+source = "TfL Quarterly Performance Report Q4 2024/25, Headcount (p.21)"
+file = "tfl_quarterly_performance_report_q4_2024_25.pdf"
+
+[reference_sources]
+"bbc_annual_report_2024_25.pdf" = "https://assets.publishing.service.gov.uk/media/6876519139d0452326e28ec7/BBC_Annual_Report___Accounts_24_25_final_accessible.pdf"
+"boe_annual_report_2025.pdf" = "https://www.bankofengland.co.uk/-/media/boe/files/annual-report/2025/boe-2025.pdf"
+"british_steel_socioeconomic_footprint_2026.pdf" = "https://www.britishsteel.co.uk/media/The-Socioeconomic-footprint-of-British-Steel-in-the-UK-2026.pdf"
+"channel4_annual_report_2024.pdf" = "https://assets-corporate.channel4.com/_flysystem/s3/2025-05/Channel%204%20Annual%20Report%202024%20-%20FINAL%20ACCESSIBLE_0.pdf"
+"caa_annual_report_2024_25.pdf" = "https://www.caa.co.uk/media/02saskcz/cap3143-caa_annual-report-2024-25.pdf"
+"nao_annual_report_2024_25.pdf" = "https://www.nao.org.uk/wp-content/uploads/2025/06/nao-annual-report-and-accounts-2024-25.pdf"
+"national_highways_annual_report_2024_25.pdf" = "https://assets.publishing.service.gov.uk/media/687a00cc0263c35f52e4ddf5/National_Highways_ARA_24-25.pdf"
+"network_rail_annual_report_2025.pdf" = "https://sacuksprodnrdigital0001.blob.core.windows.net/annual-report-and-accounts-archive/Annual%20report%20and%20accounts%20archive/2021%20-%202025%20-%20Annual%20Report%20PDFs/Network-Rail-Annual-Report-and-Accounts-2025.pdf"
+"ordnance_survey_annual_report_2024_25.pdf" = "https://assets.publishing.service.gov.uk/media/68778cca2bad77c3dae4dc61/OS_Annual_Report_2024_2025_WEB.pdf"
+"tfl_quarterly_performance_report_q4_2024_25.pdf" = "https://content.tfl.gov.uk/tfl-quarterly-performance-report-q4-2024-25.pdf"
+
+[llm]
+extract_system_prompt = """You are an expert on work in UK public corporations and other public bodies, \
+including public service broadcasting and media production, central banking and financial \
+regulation, aviation regulation, public audit, rail and road infrastructure operation and \
+maintenance, urban transport, mapping and geospatial data, and steelmaking, covering both \
+operational and technical roles and corporate functions such as finance, HR, digital, legal \
+and communications. Your job is to extract the tasks from a job advert and assess the \
+automation potential of each with current AI systems."""
+label_system_prompt = """You are an expert on work in UK public corporations and other public bodies. You classify \
+tasks that were extracted from a job advert by how substantive each is to the role, so that \
+non-meaningful items can be filtered out before analysis."""
