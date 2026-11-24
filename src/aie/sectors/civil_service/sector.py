@@ -6,22 +6,31 @@ Mapping onto the contract:
   occupation_group  cs_profession (profession-corrected)
   grade             cs_grade
   region            vacancy_region
-  salary            CS Statistics salary lookup (estimated_salary from the canonical dataset)
+  salary            CS Statistics salary lookup (weighting.salary_lookup)
   headcount         number_of_jobs_available
 
-Weights: rake_1d (primary) and rake_3d, adopted from gds-idea-ai-exposure for v1.
+Release v2 is built from raw here (since 2026-11-25): grid_v2.py runs the original pipeline's
+cleaning, post-processing and profession correction (ported from gds-idea-ai-exposure, each
+module from the commit release v2 was made with), and weighting.py its raking and salary
+lookup. The task scores and the profession LLM run are stored PROCESSED inputs in raw/.
+Rebuilt this way, v2 reproduces the release first adopted from ai-exposure/v2/ exactly.
+
+Weights: rake_1d (primary) and rake_3d, on adverts with at least MIN_TASKS tasks.
 Scores: curated tasks carry the ensemble mean (CS headline) as exposure_score, plus a
 score_<model> column for each of the 8 models, including score_gpt_oss_120b for cross-sector cuts.
 """
 
 from __future__ import annotations
 
+import io
+import tempfile
 from pathlib import Path
 
 import pandas as pd
 
-from ... import storage
+from ... import settings, storage
 from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput, no_funnel
+from . import grid_v2, professions, stats_settings, weighting
 
 ADVERT_COLS = [
     "vacancy_id", "vacancy_title", "department", "job_grade", "profession", "cs_org",
@@ -37,11 +46,55 @@ class CivilService(Sector):
     slug = "civil-service"
     package_dir = Path(__file__).parent
 
+    def _raw(self, release: str, name: str) -> str:
+        return storage.join(settings.raw_dir(self.slug, release), name)
+
+    def _use_stats(self, release: str) -> str:
+        """Copy the release's Civil Service Statistics tables to a local folder and point
+        cs_stats / rake / salary at it."""
+        folder = tempfile.mkdtemp(prefix="aie-cs-stats-")
+        for name in self.config["reference_sources"]:
+            Path(folder, name).write_bytes(storage.read_bytes(self.reference(name, release)))
+        stats_settings.use_stats_dir(folder)
+        return folder
+
+    def post_processed(self, release: str) -> pd.DataFrame:
+        """The post-processed, profession-corrected adverts (grid_v2.build) from raw/."""
+        raw = self.config["raw"]
+        labels = pd.concat(
+            [
+                professions.parse_batch_output(
+                    storage.read_bytes(self._raw(release, f)).decode().splitlines()
+                )
+                for f in raw["profession_label_files"]
+            ],
+            ignore_index=True,
+        )
+        scored = storage.read_parquet(self._raw(release, raw["scores_file"]), ["vacancy_id"])
+        new_fields = pd.read_excel(
+            io.BytesIO(storage.read_bytes(self._raw(release, raw["new_fields_file"])))
+        )
+        return grid_v2.build(
+            io.BytesIO(storage.read_bytes(self._raw(release, raw["grid_file"]))),
+            io.BytesIO(storage.read_bytes(self._raw(release, raw["professions_file"]))),
+            new_fields,
+            scored["vacancy_id"].astype(str).unique(),
+            labels,
+        )
+
     def clean(self, release: str) -> CleanOutput:
-        a_src, c_src = self.legacy("adverts"), self.legacy("canonical")
-        a = storage.read_parquet(a_src, columns=ADVERT_COLS)
-        c = storage.read_parquet(c_src, columns=["vacancy_id", "estimated_salary", "salary_source"])
-        a = a.merge(c, on="vacancy_id", how="left", validate="one_to_one")
+        g = self.post_processed(release)
+        self._use_stats(release)
+        lookup = weighting.salary_lookup(g)
+        a = g[ADVERT_COLS].copy()
+        key = ["cs_org", "cs_grade", "cs_profession"]
+        sal = (
+            a[key]
+            .astype(str)
+            .merge(lookup[[*key, "estimated_salary", "salary_source"]], on=key, how="left")
+        )
+        a["estimated_salary"] = sal["estimated_salary"].to_numpy()
+        a["salary_source"] = sal["salary_source"].to_numpy()
         for col in ("department", "cs_org", "cs_profession", "cs_grade"):
             a[col] = a[col].astype("string")
 
@@ -82,10 +135,16 @@ class CivilService(Sector):
                 ).str.strip(),
             }
         )
-        return CleanOutput(adverts, ext, text, no_funnel(len(a)), inputs=[a_src, c_src])
+        raw_dir = settings.raw_dir(self.slug, release)
+        return CleanOutput(
+            adverts, ext, text, no_funnel(len(a), "post-processed GRID adverts"),
+            inputs=[raw_dir, self.reference("", release)],
+        )  # fmt: skip
 
     def score(self, release: str) -> ScoreOutput:
-        src = self.legacy("tasks")
+        # The August 2026 extraction (Sonnet 4.6) and eight-model scoring, kept in raw/ as a
+        # PROCESSED input rather than re-run.
+        src = self._raw(release, self.config["raw"]["scores_file"])
         models = self.config["scoring"]["models"]
         t = storage.read_parquet(
             src, columns=["vacancy_id", "task_number", "task", *models, "mean_ap"]
@@ -117,33 +176,34 @@ class CivilService(Sector):
     def weight(
         self, release: str, adverts: pd.DataFrame, ext: pd.DataFrame, n_tasks: pd.Series
     ) -> WeightOutput:
-        src = self.legacy("weights")
-        w = storage.read_parquet(src)
-        w["vacancy_id"] = self.ids(w["vacancy_id"])
-        cfg = self.config["weighting"]
-        frames = []
-        for spec, col in (("rake_1d", "weight_1d"), ("rake_3d", "weight_3d")):
-            frames.append(
-                adverts[["vacancy_id"]]
-                .merge(w[["vacancy_id", col]], on="vacancy_id", how="left")
-                .rename(columns={col: "weight"})
-                .assign(
-                    weight_spec=spec,
-                    is_primary=spec == cfg["primary_spec"],
-                    target_source=cfg["target_source"],
-                    target_date=cfg["target_date"],
-                )
-            )
-        weights = pd.concat(frames, ignore_index=True)
-        diag = {
-            spec: {
-                "n_weighted": int(g["weight"].notna().sum()),
-                "weighted_fte": float(g["weight"].sum()),
+        self._use_stats(release)
+        sample = self.min_tasks_sample(adverts, n_tasks)
+        grid = pd.DataFrame(
+            {
+                "vacancy_id": sample["source_vacancy_id"].astype(str),
+                "cs_org": sample["org_unit"].astype(str),
+                "cs_grade": sample["grade"].astype(str),
+                "cs_profession": sample["occupation_group"].astype(str),
+                "number_of_jobs_available": sample["headcount"].astype("int64"),
             }
-            for spec, g in weights.groupby("weight_spec")
-        }
-        diag["note"] = "adopted from gds-idea-ai-exposure stage 3 (v2/raw/vacancy_weights.parquet)"
-        return WeightOutput(weights, None, diag, inputs=[src])
+        )
+        w, diag = weighting.raking_weights(grid)
+        w = w.assign(vacancy_id=self.ids(w["vacancy_id"]))
+        cfg = self.config["weighting"]
+        frames = [
+            adverts[["vacancy_id"]]
+            .merge(w[["vacancy_id", col]], on="vacancy_id", how="left")
+            .rename(columns={col: "weight"})
+            .assign(
+                weight_spec=spec,
+                is_primary=spec == cfg["primary_spec"],
+                target_source=cfg["target_source"],
+                target_date=cfg["target_date"],
+            )
+            for spec, col in (("rake_1d", "weight_1d"), ("rake_3d", "weight_3d"))
+        ]
+        diag["min_tasks_sample"] = int(len(sample))
+        return WeightOutput(pd.concat(frames, ignore_index=True), None, diag)
 
 
 SECTOR = CivilService

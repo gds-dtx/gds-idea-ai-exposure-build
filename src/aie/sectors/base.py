@@ -8,12 +8,11 @@ A sector is a folder under `aie/sectors/` with:
 Each stage returns plain DataFrames in the standard shape; `aie.build` writes them to
 build/sector=<s>/release=<r>/<layer>/ and `aie.publish` turns them into the curated tables.
 
-Every sector except the Civil Service builds from the raw adverts in its release's raw/ folder,
-with the cleaning rules ported from the original per-sector repos (2026-11-24) and checked to
-reproduce the published release exactly. The earlier Bedrock task scores are kept in raw/ as
-PROCESSED inputs (flagged in raw/README.md) rather than re-run. The Civil Service v2 still
-ADOPTS the outputs that already exist (read-only, from the pre-scaffold S3 folder) until its
-raw files are available.
+Every sector builds from the raw adverts in its release's raw/ folder, with the cleaning rules
+ported from the original per-sector repos (2026-11-24/25) and checked to reproduce the published
+release exactly. The earlier Bedrock task scores (and the Civil Service profession
+classification) are kept in raw/ as PROCESSED inputs (flagged in raw/README.md) rather than
+re-run. Civil Service v1 (the original single-model pipeline) is kept as data only.
 """
 
 from __future__ import annotations

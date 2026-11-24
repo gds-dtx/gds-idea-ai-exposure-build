@@ -48,5 +48,11 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["B905"]
 
+[tool.ruff.lint.per-file-ignores]
+# Copied from gds-idea-ai-exposure so release v2 reproduces exactly; style left as it was.
+"src/aie/sectors/civil_service/{cs_stats,grid_cleaning,mappings,post_processing,rake,salary}.py" = [
+    "E501", "F541", "B007", "F841",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

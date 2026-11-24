@@ -17,47 +17,124 @@ rename_models = { "openai-oss-120b" = "gpt-oss-120b" }
 primary_spec = "rake_1d"
 target_source = "Civil Service Statistics data browser 2026 (dept x grade x profession)"
 target_date = "2026"
-# v1 ADOPTS the weights gds-idea-ai-exposure published (stage 3). Porting CS's raking (1D and
-# the 3D post-stratification, CS-stats suppression handling) is part of folding that repo in.
+# 1D IPF (primary) and 3D post-stratification, on adverts with at least MIN_TASKS tasks, as
+# release v2's published weights were (weighting.py, rake.py, cs_stats.py).
 
 [salary]
 primary = "Civil Service Statistics mean salary, dept x grade x profession with fallbacks"
 
 # CS releases.
-#   v1  legacy: the original pipeline (role-level, single-model, still read by older
-#       products). Data only: inputs in build/.../release=v1/raw/,
-#       tables (old schema) in curated/sector=civil-service/release=v1/, cuts in
-#       cuts/civil-service/release=v1/. Not built here. Copied by a one-off migration script.
-#   v2  the current CS outputs (8-model ensemble, GRID, raked 1D/3D), adopted from the old
-#       layout's ai-exposure/v2/ and mapped onto the curated contract.
+#   v1  legacy: the original pipeline (role-level, single-model). Data only for now: inputs in
+#       build/.../release=v1/raw/, tables (old schema) in curated/sector=civil-service/release=v1/.
+#   v2  the current CS release (8-model ensemble on GRID adverts, raked 1D/3D). Built from raw
+#       here since 2026-11-25 (grid_v2.py and the modules it calls), reproducing the release
+#       first adopted from ai-exposure/v2/.
 [releases]
 v1 = "legacy"
-v2 = "adopt"
+v2 = "build"
 
-# v2 adopts these (paths relative to settings.LEGACY_ROOT).
-[legacy]
-adverts = "v2/raw/grid_post_processed_profession_corrected.parquet"
-canonical = "v2/raw/canonical_vacancy_dataset.parquet"
-tasks = "v2/raw/grid_tasks_scored_ALL_MODELS_wide.parquet"
-weights = "v2/raw/vacancy_weights.parquet"
-vacancy_exposure = "v2/raw/vacancy_exposure.parquet"   # used only to check reproduction
-
-# Every current (non-OLD_*) file in ai-exposure/v2/raw, so release=v2/raw/ is complete.
 [raw]
+# Copied once from the pre-scaffold folders; the build reads only these copies.
 files = [
-    "v2/raw/canonical_vacancy_dataset.parquet",
+    "v2/raw/170426 - UpdatedCivilServiceJobData.csv",
+    "v2/raw/Matthew Professions.csv",
+    "v2/raw/dsit_full_dept.xlsx",
     "v2/raw/grid_tasks_scored_ALL_MODELS_wide.parquet",
-    "v2/raw/vacancy_weights.parquet",
-    "v2/raw/vacancy_exposure.parquet",
-    "v2/raw/vacancy_exposure_metadata.json",
-    "v2/raw/grid_as_scored.parquet",
-    "v2/raw/grid_post_processed_profession_corrected.parquet",
-    "v2/raw/grid_tasks_scored_ALL_MODELS_long_w_reasoning.parquet",
-    "v2/raw/salary_lookup.parquet",
-    "v2/raw/salary_lookup_metadata.json",
-    "v2/raw/vacancy_weights_metadata.json",
-    "v2/raw/canonical_vacancy_dataset_metadata.json",
 ]
+# The two profession_label_files below were uploaded straight to raw/ (2026-11-25) from the
+# original run's Bedrock batch output; they are listed in [raw.notes].
+grid_file = "170426 - UpdatedCivilServiceJobData.csv"
+professions_file = "Matthew Professions.csv"
+new_fields_file = "dsit_full_dept.xlsx"
+scores_file = "grid_tasks_scored_ALL_MODELS_wide.parquet"
+profession_label_files = [
+    "profession-classification-full-batch-v2-1.jsonl.out",
+    "profession-classification-full-batch-v2-2.jsonl.out",
+]
+
+# What each raw file is. "processed" = an earlier repo's output kept as an input or for
+# reference (flagged in raw/README.md, which `aie build civil-service raw` writes).
+[raw.notes."170426 - UpdatedCivilServiceJobData.csv"]
+kind = "original"
+note = "GRID export of Civil Service Jobs adverts (April 2026), as received from the GRID team. Cleaned by grid_cleaning.py."
+
+[raw.notes."Matthew Professions.csv"]
+kind = "original"
+note = "GRID profession for each advert, as received from the GRID team with the export."
+
+[raw.notes."dsit_full_dept.xlsx"]
+kind = "original"
+note = "Extra GRID fields per advert (number of posts, location, business area, salary range), as received. Joined in post_processing."
+
+[raw.notes."grid_tasks_scored_ALL_MODELS_wide.parquet"]
+kind = "processed"
+note = """PROCESSED, not raw: the tasks extracted by Claude Sonnet 4.6 and scored by eight models \
+(August 2026 Bedrock runs by gds-idea-ai-exposure, notebooks 1a and 1b), from the cleaned adverts \
+the build now produces. Kept as an input so the LLM runs are not repeated."""
+
+[raw.notes."profession-classification-full-batch-v2-1.jsonl.out"]
+kind = "processed"
+note = """PROCESSED, not raw: Bedrock batch output (Qwen 3 235B) classifying the profession of \
+adverts GRID labels 'Other' (gds-idea-ai-exposure notebook 1d, August 2026), part 1 of 2. Parsed \
+by professions.py."""
+
+[raw.notes."profession-classification-full-batch-v2-2.jsonl.out"]
+kind = "processed"
+note = "PROCESSED, not raw: part 2 of 2 of the same profession classification run."
+
+[raw.notes."canonical_vacancy_dataset.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."vacancy_weights.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."vacancy_exposure.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."vacancy_exposure_metadata.json"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."grid_as_scored.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."grid_post_processed_profession_corrected.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."grid_tasks_scored_ALL_MODELS_long_w_reasoning.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."salary_lookup.parquet"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."salary_lookup_metadata.json"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."vacancy_weights_metadata.json"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+[raw.notes."canonical_vacancy_dataset_metadata.json"]
+kind = "processed"
+note = "PROCESSED, not raw: an output of the original gds-idea-ai-exposure pipeline, copied here when v2 was first adopted. Kept for reference; the build does not read it."
+
+# Civil Service Statistics 2026 tables (data browser), as downloaded on 2026-09-28 by the
+# original pipeline and used for release v2's weights and salaries. Copied into reference/.
+[reference_sources]
+"organisations.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/organisations.csv"
+"grades.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/grades.csv"
+"professions.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/professions.csv"
+"salaries.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/salaries.csv"
+"salaries_by_dept_grade_prof.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/salaries_by_dept_grade_prof.csv"
+"profession_by_dept.csv" = "~/Documents/gds-idea-ai-exposure/data/raw/profession_by_dept.csv"
 
 [llm]
 extract_system_prompt = """You are an expert on UK Civil Service work. Your job is to extract the tasks from a job \
