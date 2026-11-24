@@ -73,7 +73,9 @@ Sensitivity scenarios are not published here. They are computed on the fly with
 
 Each sector folder (`src/aie/sectors/<x>/`) has a `config.toml` (its releases, sources and
 raking targets) and a `sector.py`. Adding a sector means copying a folder. Notes on the
-official statistics used for weighting are in `docs/`:
+official statistics used for weighting are in `docs/`. A full methodology write-up for each
+sector, with figures, is kept with the data rather than here (`methodology/` in the S3 folder).
+Source notes:
 
 - Local government: ONS QPSES via the LGA ([docs/qpses.md](docs/qpses.md))
 - Police: Home Office police workforce ([docs/police_workforce.md](docs/police_workforce.md))
