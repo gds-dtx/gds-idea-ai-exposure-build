@@ -50,8 +50,48 @@ def copy_raw(sector: Sector, release: str) -> list[str]:
         meta["copied"].setdefault(
             PurePosixPath(dest).name, {"source": src, "on": date.today().isoformat()}
         )
+    notes = raw_notes(sector)
+    for name, entry in meta["copied"].items():
+        if name in notes:
+            entry.update(notes[name])
     storage.write_json(meta | {"sector": sector.slug, "release": release, "layer": "raw"}, meta_uri)
+    readme = raw_readme(sector, release, meta["copied"])
+    storage.write_bytes(readme.encode(), storage.join(dest_dir, "README.md"))
     return out
+
+
+def raw_notes(sector: Sector) -> dict[str, dict]:
+    """config.toml [raw.notes]: {file name: {kind, note}}. kind is "original" (as received from
+    the source) or "processed" (an earlier repo's output, kept as an input because re-making it
+    would cost Bedrock spend or is not yet ported)."""
+    return sector.config.get("raw", {}).get("notes", {})
+
+
+def raw_readme(sector: Sector, release: str, copied: dict[str, dict]) -> str:
+    rows, processed = [], []
+    for name, entry in sorted(copied.items()):
+        kind = entry.get("kind", "original")
+        rows.append(
+            f"| `{name}` | {kind} | {entry.get('note', '')} | `{entry.get('source', '')}` |"
+        )
+        if kind == "processed":
+            processed.append(name)
+    warn = ""
+    if processed:
+        files = ", ".join(f"`{n}`" for n in processed)
+        verb = "is a PROCESSED output" if len(processed) == 1 else "are PROCESSED outputs"
+        warn = (
+            f"> **Not all of these files are raw.** {files} {verb} of an earlier repo, kept here"
+            " as an input (usually because re-making it would mean paying for the LLM run"
+            " again). The build reads it as given; it was made by the earlier repo named in"
+            " its note, not by this build.\n\n"
+        )
+    return (
+        f"# {sector.name} {release}: raw inputs\n\n"
+        "The files this release is built from, copied unchanged. Written by "
+        f"`aie build {sector.slug} raw`.\n\n{warn}"
+        "| File | Kind | What it is | Copied from |\n|---|---|---|---|\n" + "\n".join(rows) + "\n"
+    )
 
 
 def copy_reference(sector: Sector, release: str) -> None:

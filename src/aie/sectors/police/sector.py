@@ -1,7 +1,7 @@
 """Police: force job-board adverts (officer, staff and PCSO roles).
 
 Mapping onto the contract:
-  employer / org_unit  canonical force name (normalised in the old cleaning repo)
+  employer / org_unit  canonical force name (cleaning.normalise_force)
   occupation_group     worker type from the title: Police officer / PCSO / Special constable /
                        Police staff (the Home Office workforce categories; title-based, so
                        approximate)
@@ -9,6 +9,9 @@ Mapping onto the contract:
   salary               advert range midpoint, annual £12k-£250k only; where the salary fields
                        are empty, the salary the advert TEXT states (salary_text.py), never an
                        estimate
+
+Built from raw (since 2026-11-24): cleaning.py holds the cleaning rules, ported from the original
+cleaning repo. Task scores are the October 2026 Bedrock run, kept in raw/ as an input.
 
 In scope: UK police forces only, and not recruitment-route pages (transferee schemes, talent
 pools, PCDA intake pages), which describe a process rather than a role.
@@ -32,11 +35,9 @@ from ..base import (
     WeightOutput,
     adopt_labelled_tasks,
     advert_midpoint_salary,
-    no_funnel,
-    to_bool,
     year_of,
 )
-from . import workforce
+from . import cleaning, workforce
 from .salary_text import salary_from_text
 
 _STAFF = r"\bpolice staff\b|\bstaff investigator\b|\binvestigat(?:or|ion) officer\b"
@@ -65,16 +66,18 @@ class Police(Sector):
     package_dir = Path(__file__).parent
 
     def clean(self, release: str) -> CleanOutput:
-        src = self.legacy("vacancies")
-        v = storage.read_parquet(src)
+        src = self._raw_path(release)
+        raw = pd.read_csv(io.BytesIO(storage.read_bytes(src)), usecols=cleaning.RAW_COLS, dtype=str)
+        # The source ids collide across boards, so the id is the row position in the raw file
+        # (as in the original cleaning repo, so ids match earlier outputs).
+        raw["vacancy_id"] = [f"pol-{i:05d}" for i in range(len(raw))]
+        v = cleaning.clean_adverts(raw)
         vid = self.ids(v["vacancy_id"])
-        in_force = to_bool(v["in_scope"]).fillna(False)
-        recruit = to_bool(v["is_recruitment_process"]).fillna(False)
-        exclusion = pd.Series(pd.NA, index=v.index, dtype="string")
-        exclusion = exclusion.mask(recruit, "recruitment-route page, not a role")
-        exclusion = exclusion.mask(~in_force, "not a UK police force")
+        exclusion = v["exclusion_reason"].mask(
+            v["exclusion_reason"].isna() & ~v["is_uk_force"], "not a UK police force"
+        )
         salary = advert_midpoint_salary(v["salary_min"], v["salary_max"])
-        from_text = self._salary_from_advert_text(v, release).where(salary.isna())
+        from_text = v["jd_text"].map(salary_from_text).astype("float64").where(salary.isna())
         source = pd.Series("advert_midpoint", index=v.index).where(salary.notna())
         source = source.mask(from_text.notna(), "advert_text")
         salary = salary.fillna(from_text)
@@ -104,36 +107,32 @@ class Police(Sector):
                 "board_id": v["id"],
                 "url": v["url"],
                 "force_raw": v["force_raw"],
-                "is_uk_force": in_force,
-                "is_recruitment_process": recruit,
+                "is_uk_force": v["is_uk_force"],
+                "is_recruitment_process": v["is_recruitment_process"],
                 "hours": v["hours"],
                 "salary_min_raw": v["salary_min"],
                 "salary_max_raw": v["salary_max"],
             }
         )
-        return CleanOutput(
-            adverts, ext, None, no_funnel(len(v)), inputs=[src, self._raw_path(release)]
-        )
+        # What the extraction prompt is given (title + cleaned text), for adverts sent for scoring.
+        sent = v["exclusion_reason"].isna()
+        text = pd.DataFrame(
+            {
+                "vacancy_id": vid[sent],
+                "advert_text": "Job title: " + v.loc[sent, "job_title"] + "\n\n"
+                + v.loc[sent, "job_text"],
+            }
+        )  # fmt: skip
+        return CleanOutput(adverts, ext, text, cleaning.funnel(v), inputs=[src])
 
-    def _raw_path(self, release: str) -> str:
-        name = Path(self.config["raw"]["files"][0]).name
+    def _raw_path(self, release: str, name: str = "all_police_jobs_combined.csv") -> str:
         return storage.join(settings.raw_dir(self.slug, release), name)
 
-    def _salary_from_advert_text(self, v: pd.DataFrame, release: str) -> pd.Series:
-        """Salary stated in the raw advert text (jd_text), matched on source + board id."""
-        raw = pd.read_csv(
-            io.BytesIO(storage.read_bytes(self._raw_path(release))),
-            usecols=["source", "id", "jd_text"],
-            dtype=str,
-        )
-        key = raw["source"] + "|" + raw["id"]
-        text = pd.Series(raw["jd_text"].to_numpy(), index=key)
-        text = text[~text.index.duplicated()]
-        found = (v["source"].astype(str) + "|" + v["id"].astype(str)).map(text)
-        return pd.Series(found.map(salary_from_text).to_numpy(), index=v.index, dtype="float64")
-
     def score(self, release: str) -> ScoreOutput:
-        return adopt_labelled_tasks(self, "police-full_run-2026-10")
+        # Scored on Bedrock (gpt-oss-120b) in October 2026 by the original cleaning repo, from the
+        # same cleaned adverts; the output is kept in raw/ as an input rather than re-run.
+        src = self._raw_path(release, self.config["scoring"]["stored_scores"])
+        return adopt_labelled_tasks(self, "police-full_run-2026-10", src)
 
     def weight(
         self, release: str, adverts: pd.DataFrame, ext: pd.DataFrame, n_tasks: pd.Series

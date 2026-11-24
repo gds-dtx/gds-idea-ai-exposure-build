@@ -22,7 +22,7 @@ PCSOs, designated officers, special constables), and by function. Police Scotlan
 publish their own equivalents.
 
 **What the adverts already give us (v1):**
-- `org_unit` = canonical force (normalised in the old cleaning repo), and `region` from the
+- `org_unit` = canonical force (normalised by `sectors/police/cleaning.py`), and `region` from the
   force.
 - `occupation_group` = worker type, classified from the job title (Police officer / PCSO /
   Special constable / Police staff). This is approximate and needs a check on a sample.

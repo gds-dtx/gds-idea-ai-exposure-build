@@ -8,9 +8,12 @@ A sector is a folder under `aie/sectors/` with:
 Each stage returns plain DataFrames in the standard shape; `aie.build` writes them to
 build/sector=<s>/release=<r>/<layer>/ and `aie.publish` turns them into the curated tables.
 
-v1 of every sector ADOPTS the outputs that already exist (read-only, from the pre-scaffold
-S3 folders) and maps them onto the contract; nothing is re-scored. Folding each old repo's
-clean-from-raw code in, so v2 can be rebuilt from raw, happens once this approach is agreed.
+Sectors are being moved to build from raw here. Police (since 2026-11-24) and public
+corporations clean from the raw adverts in their release's raw/ folder; police keeps its earlier
+Bedrock scores in raw/ as an input. The other sectors' v1 still ADOPTS the outputs that already
+exist (read-only, from the pre-scaffold S3 folders) and maps them onto the contract; nothing is
+re-scored. Each remaining old repo's cleaning is being ported the same way, one sector at a
+time, and checked to reproduce the published release exactly.
 """
 
 from __future__ import annotations
@@ -173,9 +176,10 @@ def resolve_legacy(path: str) -> str:
     return f"{settings.LEGACY_ROOT}/{path}"
 
 
-def adopt_labelled_tasks(sector: Sector, run_id: str) -> ScoreOutput:
-    """Adopt a pre-scaffold labelled_tasks_full.parquet (Education/LG/police layout)."""
-    src = sector.legacy("tasks")
+def adopt_labelled_tasks(sector: Sector, run_id: str, src: str | None = None) -> ScoreOutput:
+    """Adopt a labelled_tasks_full.parquet (Education/LG/police layout): the pre-scaffold copy,
+    or `src` (a copy kept in the release's raw/)."""
+    src = src or sector.legacy("tasks")
     t = storage.read_parquet(src)
     vid = sector.ids(t["vacancy_id"])
     model = sector.primary_score_model

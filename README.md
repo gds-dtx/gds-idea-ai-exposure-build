@@ -75,7 +75,9 @@ Each sector folder (`src/aie/sectors/<x>/`) has a `config.toml` (its releases, s
 raking targets) and a `sector.py`. Adding a sector means copying a folder. Notes on the
 official statistics used for weighting are in `docs/`. A full methodology write-up for each
 sector, with figures, is kept with the data rather than here (`methodology/` in the S3 folder).
-Source notes:
+Each release's `raw/` folder has a `README.md` (written by `aie build <s> raw` from the
+sector's `[raw.notes]`) that marks any input which is an earlier repo's **processed** output,
+such as stored LLM task scores, rather than the original source. Source notes:
 
 - Local government: ONS QPSES via the LGA ([docs/qpses.md](docs/qpses.md))
 - Police: Home Office police workforce ([docs/police_workforce.md](docs/police_workforce.md))

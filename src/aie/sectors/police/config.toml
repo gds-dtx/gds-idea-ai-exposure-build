@@ -5,6 +5,9 @@ owner = "DSIT AI exposure team"
 [scoring]
 primary_model = "gpt-oss-120b"
 bedrock_model_id = "openai.gpt-oss-120b-1:0"
+# Task extraction, scores and labels from the October 2026 Bedrock run (made by the original
+# cleaning repo from the same cleaned adverts). Kept in raw/ as an input, not re-run.
+stored_scores = "labelled_tasks_full.parquet"
 
 [weighting]
 # Police staff (incl. designated officers) + PCSOs, raked to Home Office FTE by force
@@ -26,17 +29,30 @@ ipf_tol = 1e-6
 primary = "advert salary range midpoint (no official pay source wired in yet)"
 
 [releases]
-v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+v1 = "build"   # cleaned from raw here (2026-11-24); task scores are a stored input (see [scoring])
 
 [release_settings.v1]
 weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
 
-[legacy]
-vacancies = "police/extracted_data/vacancies_full.parquet"
-tasks = "police/extracted_data/labelled_tasks_full.parquet"
-
 [raw]
-files = ["police/all_police_jobs_combined.csv"]
+# Copied once from the pre-scaffold folder; the build reads only these copies.
+files = [
+    "police/all_police_jobs_combined.csv",
+    "police/extracted_data/labelled_tasks_full.parquet",
+]
+
+# What each raw file is. "processed" = an earlier repo's output kept as an input (flagged in
+# raw/README.md, which `aie build police raw` writes).
+[raw.notes."all_police_jobs_combined.csv"]
+kind = "original"
+note = "The scraped force job-board adverts, as received. Cleaned by sectors/police/cleaning.py."
+
+[raw.notes."labelled_tasks_full.parquet"]
+kind = "processed"
+note = """PROCESSED, not raw: the tasks, gpt-oss-120b exposure scores and task labels from the \
+October 2026 Bedrock run by gds-idea-police-ai-exposure-cleaning (scripts/run_full.py), made \
+from the same cleaned adverts the build now produces. Kept as an input so the LLM run is not \
+repeated; the prompts are the build's aie.llm prompts."""
 
 # ONS region (or nation) of each force, for cuts and for a future force-level rake.
 [force_region]
