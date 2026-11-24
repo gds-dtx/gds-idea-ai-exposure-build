@@ -20,7 +20,10 @@ The package is `aie`. Other projects install it as a library for the curated loa
 
 Each layer reads only the layer before it. Fixes and method tweaks rebuild and republish a
 sector's **current** release in place; a new release (`v1`, `v2`, …) is made only when the team
-decides to keep the old one alongside (as for Civil Service v1 → v2). Every folder gets a
+decides to keep the old one alongside (as for Civil Service v1 → v2). Civil Service v1 is
+**data only** (status `legacy`): it is not built by this repo and cannot be rebuilt from raw,
+because the steps between its source adverts and its processed inputs were not kept. Every
+sector's current release is built here from raw. Every folder gets a
 `_meta.json` recording its inputs, git commit and methodology version.
 
 | Layer | Where | What |
