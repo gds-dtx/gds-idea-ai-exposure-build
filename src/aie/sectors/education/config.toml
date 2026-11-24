@@ -5,8 +5,13 @@ owner = "DSIT AI exposure team"
 [scoring]
 primary_model = "gpt-oss-120b"
 bedrock_model_id = "openai.gpt-oss-120b-1:0"
+# Task extraction, scores and labels from the October 2026 Bedrock run (made by the original
+# cleaning repo from the same cleaned adverts). Kept in raw/ as an input, not re-run.
+stored_scores = "labelled_tasks_full.parquet"
 
 [weighting]
+# GIAS state-funded schools register (for the school match), in reference/.
+gias_file = "gias_state_funded_20261007.csv"
 primary_spec = "rake_1d"
 target_source = "DfE School Workforce in England, reporting year 2025 (2025/26)"
 target_date = "2025/26"
@@ -46,15 +51,10 @@ middle_deemed_secondary = "State-funded secondary"
 primary = "DfE Teacher pay (TPS) median FTE pay for teachers; advert salary for support staff"
 
 [releases]
-v1 = "adopt"   # the existing outputs, mapped onto the curated contract
+v1 = "build"   # cleaned from raw here (2026-11-24); task scores are a stored input (see [scoring])
 
 [release_settings.v1]
 weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
-
-[legacy]
-vacancies = "Education/extracted_data/vacancies_full.parquet"
-tasks = "Education/extracted_data/labelled_tasks_full.parquet"
-weights = "Education/derived_data/raking/vacancy_weights.parquet"
 
 [raw]
 files = [
@@ -66,7 +66,51 @@ files = [
     "Education/raw/total_vacancies_published-000000000005.csv",
     "Education/raw/total_vacancies_published-000000000006.csv",
     "Education/raw/total_vacancies_published-000000000007.csv",
+    "Education/extracted_data/labelled_tasks_full.parquet",
 ]
+
+[raw.notes."total_vacancies_published-000000000000.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 0, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000001.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 1, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000002.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 2, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000003.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 3, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000004.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 4, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000005.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 5, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000006.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 6, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."total_vacancies_published-000000000007.csv"]
+kind = "original"
+note = "Teaching Vacancies advert export, shard 7, as received. Cleaned by sectors/education/cleaning.py."
+
+[raw.notes."labelled_tasks_full.parquet"]
+kind = "processed"
+note = """PROCESSED, not raw: the tasks, gpt-oss-120b exposure scores and task labels from the \
+October 2026 Bedrock run by gds-idea-education-ai-exposure-cleaning (scripts/run_full.py), made \
+from the same cleaned adverts the build now produces. Kept as an input so the LLM run is not \
+repeated; the prompts are the build's aie.llm prompts."""
+
+# Official statistics and registers, copied into build/sector=education/release=<r>/reference/.
+[reference_sources]
+"gias_state_funded_20261007.csv" = "~/Documents/gds-idea-education-ai-exposure-cleaning/interim/gias/edubaseallstatefunded20261007.csv"
 
 [llm]
 extract_system_prompt = """You are an expert on work in the UK education sector, across teaching, teaching support, \

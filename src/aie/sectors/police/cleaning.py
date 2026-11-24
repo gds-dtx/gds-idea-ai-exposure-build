@@ -6,12 +6,8 @@ the build no longer reads that repo's output. Applied to the same raw file it gi
 same advert set, force labels and flags (checked 2026-11-24).
 
 Rules, in order; the first that applies sets `exclusion_reason`:
-  1. test or dummy content (title or text)
-  2. no title or no advert text
-  3. fewer than MIN_WORDS words
-  4. fewer than MIN_UNIQ_RATIO distinct words per word (repeated filler)
-  5. a repeat: same force, title and text as another advert; the latest date is kept (ties: the
-     later row in the file)
+  1-5. the shared job-board rules (sectors/advert_cleaning.py), with the force in the repeat key
+       because national campaign adverts share identical text across forces
   6. a recruitment-route page (transferee schemes, talent pools, entry routes, promotion
      processes), which describes how to join rather than a job
 Rows 1-6 are not sent for scoring. Adverts from bodies that are not UK police forces are
@@ -20,30 +16,18 @@ scored but carry `in_scope = False` (the sector sets that reason).
 
 from __future__ import annotations
 
-import hashlib
 import re
 
 import pandas as pd
-from selectolax.lexbor import LexborHTMLParser
+
+from ..advert_cleaning import exclusion_reasons, funnel, strip_html
+
+__all__ = ["clean_adverts", "funnel", "is_recruitment_process", "normalise_force", "strip_html"]
 
 RAW_COLS = [
     "source", "id", "url", "job_title", "force", "salary_min", "salary_max",
     "hours", "date", "jd_text",
 ]  # fmt: skip
-
-MIN_WORDS = 20
-MIN_UNIQ_RATIO = 0.05
-JUNK_TEXT_PATTERNS = [
-    r"smoke test",
-    r"this is a test",
-    r"for testing purposes",
-    r"\btest vacancy\b",
-    r"\bdummy (?:vacancy|advert|job)\b",
-    r"\bplease ignore this\b",
-]
-_JUNK_TEXT_RE = re.compile("|".join(JUNK_TEXT_PATTERNS), re.IGNORECASE)
-_WS_RE = re.compile(r"\s+")
-_NOISE_RE = re.compile(r"(&nbsp;| |​|﻿)", re.IGNORECASE)
 
 RECRUITMENT_PAGE = "recruitment-route page, not a role"
 
@@ -112,23 +96,6 @@ def is_recruitment_process(title: object) -> bool:
     return bool(isinstance(title, str) and _RECRUIT_RE.search(title))
 
 
-# --- text -----------------------------------------------------------------------------------
-
-
-def strip_html(value: object) -> str:
-    """HTML and entities -> plain text; plain strings are only whitespace-normalised."""
-    if not isinstance(value, str) or not value:
-        return ""
-    if "<" in value:
-        value = LexborHTMLParser(value).text(separator=" ")
-    return _WS_RE.sub(" ", _NOISE_RE.sub(" ", value)).strip()
-
-
-def _norm_key(text: str) -> str:
-    key = _WS_RE.sub(" ", re.sub(r"[^a-z0-9 ]", "", text.lower())).strip()
-    return hashlib.md5(key.encode()).hexdigest()
-
-
 def clean_adverts(raw: pd.DataFrame) -> pd.DataFrame:
     """Every raw row, in file order, with job_text, force, is_uk_force, is_recruitment_process
     and exclusion_reason (NA when the advert is sent for scoring). Pure function (tested).
@@ -143,39 +110,7 @@ def clean_adverts(raw: pd.DataFrame) -> pd.DataFrame:
     d["is_uk_force"] = norm.map(lambda t: t[1])
     d["is_recruitment_process"] = d["job_title"].map(is_recruitment_process)
 
-    title = d["job_title"].fillna("")
-    words = d["job_text"].str.split()
-    n_words = words.map(len)
-    uniq = words.map(lambda w: len(set(w))) / n_words.clip(lower=1)
-    reason = pd.Series(pd.NA, index=d.index, dtype="string")
-
-    def first(mask: pd.Series, why: str) -> None:
-        reason.loc[reason.isna() & mask] = why
-
-    first(d["job_text"].str.contains(_JUNK_TEXT_RE) | title.str.contains(_JUNK_TEXT_RE),
-          "test or dummy advert")  # fmt: skip
-    first(title.str.strip().eq("") | d["job_text"].eq(""), "no title or advert text")
-    first(n_words < MIN_WORDS, f"under {MIN_WORDS} words")
-    first(uniq < MIN_UNIQ_RATIO, "repeated filler text")
-
-    # Repeats across boards: same force + normalised title + text. The force is in the key
-    # because national campaign adverts share identical text across forces. Keep the latest
-    # date; ties keep the later row (stable sort).
-    alive = d[reason.isna()]
-    key = (alive["force"].fillna("") + " " + alive["job_title"].fillna("") + " "
-           + alive["job_text"]).map(_norm_key)  # fmt: skip
-    order = alive.assign(_key=key).sort_values("date", kind="stable")
-    keep = order.drop_duplicates("_key", keep="last").index
-    first(d.index.isin(alive.index) & ~d.index.isin(keep), "repeat of another advert")
-    first(d["is_recruitment_process"], RECRUITMENT_PAGE)
-
+    reason = exclusion_reasons(d, key_prefix=d["force"])
+    reason.loc[reason.isna() & d["is_recruitment_process"]] = RECRUITMENT_PAGE
     d["exclusion_reason"] = reason
     return d
-
-
-def funnel(d: pd.DataFrame) -> pd.DataFrame:
-    rows = [{"step": "raw adverts", "rows": len(d)}]
-    for why, n in d["exclusion_reason"].value_counts().items():
-        rows.append({"step": f"excluded: {why}", "rows": int(n)})
-    rows.append({"step": "sent for scoring", "rows": int(d["exclusion_reason"].isna().sum())})
-    return pd.DataFrame(rows)

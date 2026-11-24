@@ -14,18 +14,24 @@ posts in council-maintained schools. They stay in local government with `is_scho
 curated vacancies so any cut can include or exclude them. To discuss: these staff are probably
 also in DfE's School Workforce figures that Education rakes to.
 
-Weights: raked to council headcount from ONS QPSES (LGA per-authority tables), see qpses.py.
+Built from raw (since 2026-11-24): clean_adverts below holds the cleaning rules, ported from the
+original cleaning repo. Task scores are the October 2026 Bedrock run, kept in raw/ as a
+PROCESSED input (see config.toml [raw.notes]).
+
+Weights: raked to council FTE from ONS QPSES (LGA per-authority tables), see qpses.py.
 Adverts from councils QPSES does not cover (Scottish and NI councils, town and parish
 councils, other bodies) are kept but get no weight.
 """
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pandas as pd
 
-from ... import storage
+from ... import settings, storage
+from ..advert_cleaning import exclusion_reasons, funnel, strip_html
 from ..base import (
     CleanOutput,
     ScoreOutput,
@@ -33,10 +39,30 @@ from ..base import (
     WeightOutput,
     adopt_labelled_tasks,
     advert_midpoint_salary,
-    no_funnel,
     year_of,
 )
 from . import qpses
+
+RAW_COLS = [
+    "source", "id", "url", "job_title", "council", "salary_min", "salary_max",
+    "hours", "date", "jd_text", "document_text",
+]  # fmt: skip
+
+
+def clean_adverts(raw: pd.DataFrame) -> pd.DataFrame:
+    """Every raw row, in file order, with job_text and exclusion_reason (NA = sent for scoring).
+
+    Ported from gds-idea-local-govt-ai-exposure-cleaning: advert text is jd_text plus any
+    attached document text; the shared job-board rules (advert_cleaning.py) with title + text
+    as the repeat key. `raw` must already carry `vacancy_id`.
+    """
+    d = raw.copy().reset_index(drop=True)
+    jd = d["jd_text"].map(strip_html)
+    doc = d["document_text"].map(strip_html)
+    d["job_text"] = (jd + " " + doc).str.strip()
+    d["exclusion_reason"] = exclusion_reasons(d)
+    return d
+
 
 SCHOOL_TITLE_PATTERNS = {
     "teacher": r"\bteacher\b(?!.*assistant)|\bteachers\b",
@@ -61,8 +87,12 @@ class LocalGovt(Sector):
     package_dir = Path(__file__).parent
 
     def clean(self, release: str) -> CleanOutput:
-        src = self.legacy("vacancies")
-        v = storage.read_parquet(src)
+        src = self._raw_path(release)
+        raw = pd.read_csv(io.BytesIO(storage.read_bytes(src)), usecols=RAW_COLS, dtype=str)
+        # The source ids collide across boards, so the id is the row position in the raw file
+        # (as in the original cleaning repo, so ids match earlier outputs).
+        raw["vacancy_id"] = [f"lg-{i:07d}" for i in range(len(raw))]
+        v = clean_adverts(raw)
         vid = self.ids(v["vacancy_id"])
         posted = pd.to_datetime(v["date"], errors="coerce")
         salary = advert_midpoint_salary(v["salary_min"], v["salary_max"])
@@ -82,8 +112,8 @@ class LocalGovt(Sector):
                 "salary_annual_gbp": salary,
                 "salary_source": pd.Series("advert_midpoint", index=v.index).where(salary.notna()),
                 "headcount": 1,
-                "in_scope": True,
-                "exclusion_reason": pd.NA,
+                "in_scope": v["exclusion_reason"].isna(),
+                "exclusion_reason": v["exclusion_reason"],
             }
         )
         q = qpses.load(self.reference(self.config["weighting"]["reference_file"], release))
@@ -104,11 +134,26 @@ class LocalGovt(Sector):
                 "authority_type": per["authority_type"],
             }
         )
+        # What the extraction prompt is given (title + cleaned text), for adverts sent for scoring.
+        sent = v["exclusion_reason"].isna()
+        text = pd.DataFrame(
+            {
+                "vacancy_id": vid[sent],
+                "advert_text": "Job title: " + v.loc[sent, "job_title"] + "\n\n"
+                + v.loc[sent, "job_text"],
+            }
+        )  # fmt: skip
         ref = self.reference(self.config["weighting"]["reference_file"], release)
-        return CleanOutput(adverts, ext, None, no_funnel(len(v)), inputs=[src, ref])
+        return CleanOutput(adverts, ext, text, funnel(v), inputs=[src, ref])
+
+    def _raw_path(self, release: str, name: str = "all_local_council_jobs.csv") -> str:
+        return storage.join(settings.raw_dir(self.slug, release), name)
 
     def score(self, release: str) -> ScoreOutput:
-        return adopt_labelled_tasks(self, "local-govt-full_run-2026-10")
+        # Scored on Bedrock (gpt-oss-120b) in October 2026 by the original cleaning repo, from the
+        # same cleaned adverts; the output is kept in raw/ as an input rather than re-run.
+        src = self._raw_path(release, self.config["scoring"]["stored_scores"])
+        return adopt_labelled_tasks(self, "local-govt-full_run-2026-10", src)
 
     def weight(
         self, release: str, adverts: pd.DataFrame, ext: pd.DataFrame, n_tasks: pd.Series

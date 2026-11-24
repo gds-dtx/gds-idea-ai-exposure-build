@@ -8,6 +8,10 @@ Mapping onto the contract:
   salary               DfE Teacher pay (TPS) median for the 4 teaching categories, year-matched;
                        the advert's own annual salary for support staff (no official source)
 
+Built from raw (since 2026-11-24): cleaning.py and the modules it calls (salary, categories,
+role_groups, schools) hold the rules, ported from gds-idea-education-ai-exposure-cleaning. Task
+scores and labels are the October 2026 Bedrock run, kept in raw/ as a PROCESSED input.
+
 Raked 1D to DfE School Workforce 2025/26 on dfe_category and phase. Known gaps (see README):
 no employer-type field, so independent-school adverts cannot be screened out; special/PRU and
 centrally employed staff (11.8% of FTE) have no phase equivalent in the adverts.
@@ -20,9 +24,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ... import storage
+from ... import settings, storage
 from ...methods import rake
-from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput, no_funnel
+from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput
+from . import cleaning, schools
 
 # {academic-year start: (classroom, other leadership, head)}, £ median FTE gross pay, DfE
 # "Teacher pay - TPS", read 2026-10-08. DfE blends deputy and assistant heads.
@@ -51,14 +56,6 @@ CATEGORY_TO_SLOT = {
     "Head teacher": 2,
 }
 
-VACANCY_COLS = [
-    "vacancy_id", "job_title", "job_advert", "first_published_on", "year", "dfe_category",
-    "is_teaching", "primary_education_phase", "education_phase", "primary_job_role",
-    "job_type_clean", "working_patterns", "salary_min", "salary_max", "salary_basis",
-    "salary_is_actual", "candidate_school_name", "school_match_urn", "school_la",
-    "school_region", "school_phase_gias", "school_name_ambiguous", "state_funded_confirmed",
-]  # fmt: skip
-
 
 def teacher_pay(dfe_category: pd.Series, year: pd.Series) -> pd.Series:
     """External median FTE pay for teaching categories (NaN for support staff)."""
@@ -75,11 +72,18 @@ class Education(Sector):
     package_dir = Path(__file__).parent
 
     def clean(self, release: str) -> CleanOutput:
-        src = self.legacy("vacancies")
-        v = storage.read_parquet(src, columns=VACANCY_COLS)
+        raw_dir = settings.raw_dir(self.slug, release)
+        shards = [storage.join(raw_dir, Path(f).name) for f in self.config["raw"]["files"]
+                  if Path(f).name.startswith("total_vacancies_published-")]  # fmt: skip
+        gias_src = self.reference(self.config["weighting"]["gias_file"], release)
+        with storage.open_input(gias_src) as fh:
+            gias = schools.load_gias(fh)
+        v = cleaning.clean_adverts(cleaning.read_shards(shards), gias)
         year = v["year"].astype("Int64")
 
-        clean_basis = v["salary_basis"].eq("annual") & ~v["salary_is_actual"].fillna(False)
+        clean_basis = v["salary_basis"].eq("annual") & ~v["salary_is_actual"].fillna(False).astype(
+            bool
+        )
         advert = v[["salary_min", "salary_max"]].mean(axis=1, skipna=True).where(clean_basis)
         tps = teacher_pay(v["dfe_category"], year.astype("float64"))
         salary = tps.fillna(advert)
@@ -105,8 +109,8 @@ class Education(Sector):
                 "salary_annual_gbp": salary,
                 "salary_source": source,
                 "headcount": 1,
-                "in_scope": True,
-                "exclusion_reason": pd.NA,
+                "in_scope": v["exclusion_reason"].isna(),
+                "exclusion_reason": v["exclusion_reason"],
             }
         )
         phase_map = self.config["weighting"]["phase_map"]
@@ -128,11 +132,22 @@ class Education(Sector):
                 "state_funded_confirmed": v["state_funded_confirmed"],
             }
         )
-        text = pd.DataFrame({"vacancy_id": vid, "advert_text": v["job_advert"]})
-        return CleanOutput(adverts, ext, text, no_funnel(len(v)), inputs=[src])
+        sent = v["exclusion_reason"].isna()  # the extraction prompt was given title + text
+        text = pd.DataFrame(
+            {
+                "vacancy_id": vid[sent],
+                "advert_text": "Job title: " + v.loc[sent, "job_title"] + "\n\n"
+                + v.loc[sent, "job_text"],
+            }
+        )  # fmt: skip
+        return CleanOutput(adverts, ext, text, cleaning.funnel(v), inputs=[raw_dir, gias_src])
 
     def score(self, release: str) -> ScoreOutput:
-        src = self.legacy("tasks")
+        # Scored and labelled on Bedrock (gpt-oss-120b) in October 2026 by the original cleaning
+        # repo, from the same cleaned adverts; kept in raw/ as a PROCESSED input, not re-run.
+        src = storage.join(
+            settings.raw_dir(self.slug, release), self.config["scoring"]["stored_scores"]
+        )
         t = storage.read_parquet(src)
         vid = self.ids(t["vacancy_id"])
         model = self.primary_score_model

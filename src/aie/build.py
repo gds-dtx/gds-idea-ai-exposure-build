@@ -41,7 +41,7 @@ def copy_raw(sector: Sector, release: str) -> list[str]:
             storage.copy(src, dest)
             print(f"  copied {src} -> {dest}")
         out.append(dest)
-    if not out:
+    if not out and not raw_notes(sector):
         print(f"  {sector.slug}: no raw files configured (see config.toml [raw])")
         return out
     meta_uri = storage.join(dest_dir, "_meta.json")
@@ -51,9 +51,8 @@ def copy_raw(sector: Sector, release: str) -> list[str]:
             PurePosixPath(dest).name, {"source": src, "on": date.today().isoformat()}
         )
     notes = raw_notes(sector)
-    for name, entry in meta["copied"].items():
-        if name in notes:
-            entry.update(notes[name])
+    for name, note in notes.items():  # files uploaded straight to raw/ are listed too
+        meta["copied"].setdefault(name, {"source": "uploaded directly to raw/"}).update(note)
     storage.write_json(meta | {"sector": sector.slug, "release": release, "layer": "raw"}, meta_uri)
     readme = raw_readme(sector, release, meta["copied"])
     storage.write_bytes(readme.encode(), storage.join(dest_dir, "README.md"))

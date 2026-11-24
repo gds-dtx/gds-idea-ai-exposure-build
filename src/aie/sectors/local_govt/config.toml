@@ -5,6 +5,9 @@ owner = "DSIT AI exposure team"
 [scoring]
 primary_model = "gpt-oss-120b"
 bedrock_model_id = "openai.gpt-oss-120b-1:0"
+# Task extraction, scores and labels from the October 2026 Bedrock run (made by the original
+# cleaning repo from the same cleaned adverts). Kept in raw/ as an input, not re-run.
+stored_scores = "labelled_tasks_full.parquet"
 
 [weighting]
 # Raked to council FTE from the ONS Quarterly Public Sector Employment Survey, as
@@ -32,17 +35,30 @@ ipf_tol = 1e-6
 primary = "advert salary range midpoint (no official pay source wired in yet)"
 
 [releases]
-v1 = "adopt"   # the existing outputs, mapped onto the curated contract; councils with no adverts shared out (qpses.share_out, 2026-11-04)
+v1 = "build"   # cleaned from raw here (2026-11-24); task scores are a stored input (see [scoring]); councils with no adverts shared out (qpses.share_out, 2026-11-04)
 
 [release_settings.v1]
 weight_on_salaried = true  # since 2026-11-09 (aie.build.weight_on_salaried); earlier basis kept as <spec>_all_adverts
 
-[legacy]
-vacancies = "local-govt/extracted_data/vacancies_full.parquet"
-tasks = "local-govt/extracted_data/labelled_tasks_full.parquet"
-
 [raw]
-files = ["local-govt/all_local_council_jobs.csv"]
+# Copied once from the pre-scaffold folder; the build reads only these copies.
+files = [
+    "local-govt/all_local_council_jobs.csv",
+    "local-govt/extracted_data/labelled_tasks_full.parquet",
+]
+
+# What each raw file is. "processed" = an earlier repo's output kept as an input (flagged in
+# raw/README.md, which `aie build local-govt raw` writes).
+[raw.notes."all_local_council_jobs.csv"]
+kind = "original"
+note = "The scraped council job-board adverts, as received. Cleaned by sectors/local_govt/sector.py (clean_adverts)."
+
+[raw.notes."labelled_tasks_full.parquet"]
+kind = "processed"
+note = """PROCESSED, not raw: the tasks, gpt-oss-120b exposure scores and task labels from the \
+October 2026 Bedrock run by gds-idea-local-govt-ai-exposure-cleaning (scripts/run_full.py), made \
+from the same cleaned adverts the build now produces. Kept as an input so the LLM run is not \
+repeated; the prompts are the build's aie.llm prompts."""
 
 [llm]
 extract_system_prompt = """You are an expert on work in UK local government, across council services such as social \

@@ -104,6 +104,12 @@ def write_bytes(data: bytes, uri: str) -> None:
         fh.write(data)
 
 
+def open_input(uri: str):
+    """A readable stream (context manager), for files too large to read into memory at once."""
+    fs, path = _fs_path(uri)
+    return fs.open_input_stream(path)
+
+
 def read_json(uri: str) -> dict:
     return json.loads(read_bytes(uri))
 

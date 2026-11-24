@@ -5,6 +5,9 @@ owner = "DSIT AI exposure team"
 [scoring]
 primary_model = "gpt-oss-120b"
 bedrock_model_id = "openai.gpt-oss-120b-1:0"
+# Task extraction and scores from the 2026 Bedrock run (made by the original cleaning repo from
+# the same cleaned adverts). Kept in raw/ as an input, not re-run. Not labelled.
+stored_scores = "tasks_full.parquet"
 
 [weighting]
 primary_spec = "rake_1d"
@@ -24,18 +27,59 @@ min_cell_sample = 30
 
 # v1 adopts these pre-scaffold outputs (paths relative to settings.LEGACY_ROOT).
 [releases]
-v1 = "adopt"   # the existing outputs, mapped onto the curated contract
-
-[legacy]
-vacancies = "NHS/extracted_data/vacancies_full.parquet"
-tasks = "NHS/extracted_data/tasks_full.parquet"
-weights = "NHS/derived_data/raking/vacancy_weights.parquet"   # used only to check reproduction
+v1 = "build"   # cleaned from raw here (2026-11-24); task scores are a stored input (see [scoring])
 
 [raw]
-# The NHS raw adverts for v1 (NHS Jobs CSV extracts 2019-2026, 10.7 GB) were uploaded directly
-# to build/sector=nhs/release=v1/raw/ on 2026-10-27; they have no older S3 copy.
-# They have no older S3 copy, so there is nothing for `aie build nhs raw` to copy.
-files = []
+# The NHS Jobs yearly exports (2019-2026, 10.7 GB) were uploaded straight to
+# build/sector=nhs/release=v1/raw/ on 2026-10-27 (they have no older S3 copy). The stored task
+# scores are copied in by `aie build nhs raw`.
+files = ["NHS/extracted_data/tasks_full.parquet"]
+
+# The yearly export the cleaning reads for each year (2019 is empty and not used).
+[raw.year_files]
+2020 = "10067031_job_advert_2020.csv"
+2021 = "2021.csv"
+2022 = "2022.csv"
+2023 = "2023.csv"
+2024 = "2024.csv"
+2025 = "2025.csv"
+2026 = "10067031_job_advert_2026.csv"
+
+# What each raw file is. "processed" = an earlier repo's output kept as an input (flagged in
+# raw/README.md, which `aie build nhs raw` writes).
+[raw.notes."tasks_full.parquet"]
+kind = "processed"
+note = """PROCESSED, not raw: the tasks and gpt-oss-120b exposure scores from the 2026 Bedrock \
+run by gds-idea-nhs-ai-exposure-cleaning (scripts/run_full.py), made from the same cleaned \
+adverts the build now produces. Kept as an input so the LLM run is not repeated. Not labelled."""
+
+[raw.notes."10067031_job_advert_2020.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2020, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."2021.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2021, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."2022.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2022, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."2023.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2023, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."2024.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2024, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."2025.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2025, as received. Cleaned by sectors/nhs/cleaning.py."
+
+[raw.notes."10067031_job_advert_2026.csv"]
+kind = "original"
+note = "NHS Jobs advert export for 2026, as received. Cleaned by sectors/nhs/cleaning.py."
 
 # Official statistics for this release, copied into build/sector=nhs/release=<r>/reference/.
 [reference_sources]

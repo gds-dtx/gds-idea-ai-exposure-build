@@ -8,6 +8,10 @@ Mapping onto the contract:
   region            NHS England region, from employer postcode area
   salary            NHS Digital Staff Earnings Estimates lookup (see salary.py)
 
+Built from raw (since 2026-11-24): cleaning.py and staff_groups.py hold the cleaning and
+staff-group rules, ported from gds-idea-nhs-ai-exposure-cleaning. Task scores are the 2026
+Bedrock run, kept in raw/ as a PROCESSED input (config.toml [raw.notes]).
+
 In scope: rake years 2021-2026 and an England postcode (HCHS is England-only; the feed is
 UK-wide). Raked 1D to HCHS May-2026 on staff_group, grade and region.
 """
@@ -18,9 +22,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from ... import storage
-from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput, no_funnel
-from . import hchs, salary
+from ... import settings, storage
+from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput
+from . import cleaning, hchs, salary
+from .staff_groups import assign_staff_group
 
 BAND_TO_GRADE = {
     "BAND_1": "Band 1",
@@ -50,13 +55,6 @@ NON_ENGLAND_POSTCODE_AREAS = frozenset(
     "CF LD LL NP SA AB DD DG EH FK G HS IV KA KW KY ML PA PH TD ZE BT GY JE IM".split()
 )
 
-VACANCY_COLS = [
-    "vacancy_id", "id", "job_title", "employer_name", "employer_address_postcode",
-    "created_date", "closing_date", "year", "staff_group", "pay_scheme_type", "pay_scheme_band",
-    "contract_type", "full_time", "part_time", "fixed_salary", "salary_range_min",
-    "salary_range_max", "salary_time_unit", "job_text",
-]  # fmt: skip
-
 
 def postcode_area(postcode: pd.Series) -> pd.Series:
     return (
@@ -72,8 +70,12 @@ class NHS(Sector):
     package_dir = Path(__file__).parent
 
     def clean(self, release: str) -> CleanOutput:
-        src = self.legacy("vacancies")
-        v = storage.read_parquet(src, columns=VACANCY_COLS)
+        raw = settings.raw_dir(self.slug, release)
+        files = [
+            (int(y), storage.join(raw, f)) for y, f in self.config["raw"]["year_files"].items()
+        ]
+        v, funnel = cleaning.clean_years(files)
+        v["staff_group"] = assign_staff_group(v)
 
         area = postcode_area(v["employer_address_postcode"])
         lk = storage.read_csv(
@@ -90,9 +92,12 @@ class NHS(Sector):
         years = set(self.config["weighting"]["rake_years"])
         non_england = area.isin(NON_ENGLAND_POSTCODE_AREAS)
         in_years = v["year"].isin(years)
-        exclusion = pd.Series(pd.NA, index=v.index, dtype="string")
-        exclusion = exclusion.mask(non_england, "outside England (HCHS is England-only)")
-        exclusion = exclusion.mask(~in_years, "outside rake years 2021-2026")
+        # A cleaning reason comes first; then the year rule over the England rule (as before).
+        exclusion = v["exclusion_reason"].astype("string")
+        exclusion = exclusion.mask(exclusion.isna() & ~in_years, "outside rake years 2021-2026")
+        exclusion = exclusion.mask(
+            exclusion.isna() & non_england, "outside England (HCHS is England-only)"
+        )
 
         vid = self.ids(v["vacancy_id"])
         adverts = pd.DataFrame(
@@ -133,13 +138,16 @@ class NHS(Sector):
                 ),
             }
         )
-        text = pd.DataFrame({"vacancy_id": vid, "advert_text": v["job_text"]})
-        return CleanOutput(
-            adverts, ext, text, no_funnel(len(v)), inputs=[src, self.reference("", release)]
-        )
+        sent = v["input_text"].notna()  # what the extraction prompt was given
+        text = pd.DataFrame({"vacancy_id": vid[sent], "advert_text": v.loc[sent, "input_text"]})
+        return CleanOutput(adverts, ext, text, funnel, inputs=[raw, self.reference("", release)])
 
     def score(self, release: str) -> ScoreOutput:
-        src = self.legacy("tasks")
+        # Scored on Bedrock (gpt-oss-120b) in 2026 by the original cleaning repo, from the same
+        # cleaned adverts; the output is kept in raw/ as a PROCESSED input rather than re-run.
+        src = storage.join(
+            settings.raw_dir(self.slug, release), self.config["scoring"]["stored_scores"]
+        )
         t = storage.read_parquet(src)
         vid = self.ids(t["vacancy_id"])
         model = self.primary_score_model
