@@ -66,3 +66,12 @@ def test_staff_groups_from_pay_scheme_and_title():
         "NHS infrastructure support",
         "Midwives",
     ]
+
+
+def test_postcode_area_regions():
+    from aie.sectors.nhs import regions
+
+    lk = regions.area_to_nhse_region()
+    assert len(lk) == 99
+    assert lk["LS"] == "North East and Yorkshire" and lk["B"] == "Midlands"
+    assert lk["SY"] == "Midlands" and "CF" not in lk  # Shropshire in, Wales out

@@ -24,7 +24,7 @@ import pandas as pd
 
 from ... import settings, storage
 from ..base import CleanOutput, ScoreOutput, Sector, WeightOutput
-from . import cleaning, hchs, salary
+from . import cleaning, hchs, regions, salary
 from .staff_groups import assign_staff_group
 
 BAND_TO_GRADE = {
@@ -78,10 +78,7 @@ class NHS(Sector):
         v["staff_group"] = assign_staff_group(v)
 
         area = postcode_area(v["employer_address_postcode"])
-        lk = storage.read_csv(
-            self.reference("postcode_area_to_nhse_region.csv", release), dtype=str
-        )
-        region = area.map(dict(zip(lk["area"].str.upper(), lk["nhse_region"])))
+        region = area.map(regions.area_to_nhse_region())
 
         grade = v["pay_scheme_band"].map(BAND_TO_GRADE)
         grade = grade.where(grade.notna() | (v["pay_scheme_type"] != VSM), "Very Senior Manager")

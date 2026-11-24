@@ -85,7 +85,6 @@ note = "NHS Jobs advert export for 2026, as received. Cleaned by sectors/nhs/cle
 [reference_sources]
 "hchs_core1_may2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/raw/Core 1. Staff group - England, NHSE region, ICS and org, May-26.csv"
 "hchs_core6_may2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/raw/Core 6. Staff group and grade - England, May-26.csv"
-"postcode_area_to_nhse_region.csv" = "~/Documents/gds-idea-nhs-ai-exposure-raking/data/reference/postcode_to_nhse_region.csv"
 "earnings_estimates_jul2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-analysis/data/raw/earnings/monthly_earnings_estimates_jul2026.csv"
 "earnings_by_band_jul2026.csv" = "~/Documents/gds-idea-nhs-ai-exposure-analysis/data/raw/earnings/monthly_earnings_by_band_grade_step_jul2026.csv"
 
